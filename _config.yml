@@ -151,4 +151,6 @@ theme: shoka
 # Deployment
 ## Docs: https://hexo.io/docs/one-command-deployment
 deploy:
-  type: ''
+  type: git
+  repo: 
+    hexo: git@8.137.76.16:/var/repo/blog.git,master
