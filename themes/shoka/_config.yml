@@ -182,8 +182,8 @@ creative_commons:
 # Valine
 # For more information: https://github.com/amehime/MiniValine
 valine:
-  appId: #Your_appId
-  appKey: #Your_appkey
+  appId: 
+  appKey: 
   placeholder: ヽ(○´∀`)ﾉ♪ # Comment box placeholder
   avatar: mp # Gravatar style : mp, identicon, monsterid, wavatar, robohash, retro
   pageSize: 10 # Pagination size
@@ -248,7 +248,7 @@ quicklink:
 # ---------------------------------------------------------------
 # analytics & SEO Settings
 # ---------------------------------------------------------------
-baidu_analytics: # <app_id>
+baidu_analytics: baea07cdd156d06fbf27702460bf3804
 
 # Disable Baidu transformation on mobile devices.
 disable_baidu_transformation: true
@@ -258,11 +258,11 @@ exturl: true
 
 # Google Webmaster tools verification.
 # See: https://www.google.com/webmasters
-google_site_verification:
+google_site_verification: HVbd_neHe-ZPmmR_IUzIfLkUgw0aC0gV_H4GvFy6m24
 
 # Bing Webmaster tools verification.
 # See: https://www.bing.com/webmaster
-bing_site_verification:
+bing_site_verification: 0B3F16A91C828F47E4FA05BA9A9D465E
 
 # Yandex Webmaster tools verification.
 # See: https://webmaster.yandex.ru
@@ -270,10 +270,10 @@ yandex_site_verification:
 
 # Baidu Webmaster tools verification.
 # See: https://ziyuan.baidu.com/site
-baidu_site_verification:
+baidu_site_verification: codeva-7m2zuOkfuy
 
 # Enable baidu push so that the blog will push the url to baidu automatically which is very helpful for SEO.
-baidu_push: false
+baidu_push: true
 
 
 #! ---------------------------------------------------------------

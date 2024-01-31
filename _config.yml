@@ -5,8 +5,8 @@
 # Site
 title: 兔肉的随笔
 subtitle: '空を見ろ。空を見続けろ。答えはそこにある'
-description: ''
-keywords:
+description: '兔肉的个人博客, 主要分享一些有关Minecraft编程开发, Unity, C#, 网页前后端的相关知识'
+keywords: 兔肉,编程,Unity,C#,Minecraft,前端,后端,博客,个人博客,兔肉的随笔
 author: TuRou
 language: zh-CN
 timezone: ''
@@ -72,7 +72,7 @@ autoprefixer:
 
 # URL
 ## Set your site url here. For example, if you use GitHub Page, set url as 'https://username.github.io/project'
-url: https://blog.trou.ltd
+url: https://turou.fun
 permalink: :title/
 permalink_defaults:
 pretty_urls:
@@ -146,7 +146,7 @@ ignore:
 # Extensions
 ## Plugins: https://hexo.io/plugins/
 ## Themes: https://hexo.io/themes/
-theme: shoka
+theme: shokaX
 
 # Deployment
 ## Docs: https://hexo.io/docs/one-command-deployment
@@ -154,3 +154,10 @@ deploy:
   type: git
   repo: 
     hexo: git@8.137.76.16:/var/repo/blog.git,master
+
+# hexo sitemap
+sitemap:
+  path: sitemap.xml
+
+baidusitemap:
+  path: baidusitemap.xml
