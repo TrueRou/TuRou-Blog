@@ -1,0 +1,56 @@
+alternate: Usagi no Niku
+darkmode: false
+
+homeConfig:
+  gradient: false # 使用CSS渐变作为文章封面
+  fixedCover: "https://ooo.0x0.ooo/2024/06/04/OJcAFG.jpg"
+
+social:
+  github: https://github.com/TrueRou || github || "#191717"
+  #google: https://plus.google.com/yourname || google
+  #twitter: https://twitter.com/yourname || twitter || "#00aff0"
+  #zhihu: https://www.zhihu.com/people/trou2004 || zhihu || "#1e88e5"
+  #music: https://music.163.com/#/user/home?id=yourid || cloud-music || "#e60026"
+  #weibo: https://weibo.com/yourname || weibo || "#ea716e"
+  #about: https://about.me/yourname || address-card || "#3b5998"
+  email: mailto:TrueRou@outlook.com || envelope || "#55acd5"
+  #facebook: https://www.facebook.com/yourname || facebook
+  #stackoverflow: https://stackoverflow.com/yourname || stack-overflow
+  #youtube: https://youtube.com/yourname || youtube
+  #instagram: https://instagram.com/yourname || instagram
+  #skype: skype:yourname?call|chat || skype
+  #douban: https://www.douban.com/people/yourname/ || douban
+
+widgets:
+  random_posts: false
+  recent_comments: false
+
+footer:
+  since: 2023
+  count: true
+post:
+  count: true
+
+seo:
+  bing: 0B3F16A91C828F47E4FA05BA9A9D465E
+  google: HVbd_neHe-ZPmmR_IUzIfLkUgw0aC0gV_H4GvFy6m24
+  baidu: baea07cdd156d06fbf27702460bf3804
+
+visitor:
+  baiduAnalytics: codeva-7m2zuOkfuy
+
+modules:
+  unlazyHash: true
+  visibilityListener: false
+
+loader:
+  start: false
+
+menu:
+  home: / || home
+  # about: /about/ || user
+  categories: /categories/ || th
+  tags: /tags/ || tags
+  archives: /archives/ || list-alt
+  # friends: /friends/ || heart
+  # links: /links/ || magic

@@ -2,35 +2,45 @@
   "name": "hexo-site",
   "version": "0.0.0",
   "private": true,
+  "hexo": {
+    "version": "7.0.0"
+  },
   "scripts": {
     "build": "hexo generate",
     "clean": "hexo clean",
     "deploy": "hexo deploy",
     "server": "hexo server"
   },
-  "hexo": {
-    "version": "7.1.1"
-  },
   "dependencies": {
-    "hexo": "^7.1.1",
+    "@algolia/client-search": "^4.22.1",
+    "@waline/client": "^3.0.1",
+    "algoliasearch": "^4.22.1",
+    "esbuild": "^0.20.0",
+    "hexo": "^7.0.0",
     "hexo-algoliasearch": "^2.0.1",
-    "hexo-autoprefixer": "^2.0.0",
-    "hexo-deployer-git": "^4.0.0",
-    "hexo-filter-flowchart": "^1.0.4",
+    "hexo-feed": "^1.1.2",
+    "hexo-fs": "^4.1.1",
     "hexo-generator-archive": "^2.0.0",
     "hexo-generator-category": "^2.0.0",
     "hexo-generator-index": "^3.0.0",
-    "hexo-generator-search": "^2.4.3",
     "hexo-generator-tag": "^2.0.0",
-    "hexo-renderer-dartsass": "^0.1.2",
+    "hexo-lightning-minify": "^0.1.5",
+    "hexo-pagination": "^3.0.0",
     "hexo-renderer-ejs": "^2.0.0",
-    "hexo-renderer-mathjax": "^0.6.0",
-    "hexo-renderer-multi-markdown-it": "^0.1.5",
+    "hexo-renderer-multi-next-markdown-it": "^0.2.1",
     "hexo-renderer-pug": "^3.0.0",
-    "hexo-renderer-stylus": "^3.0.1",
+    "hexo-renderer-stylus": "^3.0.0",
     "hexo-server": "^3.0.0",
-    "hexo-symbols-count-time": "^0.7.1",
-    "pangu": "^4.0.7",
-    "puppeteer": "^21.9.0"
+    "hexo-theme-shokax": "^0.4.2",
+    "hexo-util": "^3.2.0",
+    "instantsearch.js": "^4.64.2",
+    "js-yaml": "^4.1.0",
+    "mouse-firework": "^0.0.5",
+    "quicklink": "^2.3.0",
+    "theme-shokax-anime": "^0.0.6",
+    "theme-shokax-pjax": "^0.0.3",
+    "twikoo": "^1.6.31",
+    "unlazy": "^0.10.4",
+    "vue": "^3.4.15"
   }
 }
