@@ -28,6 +28,12 @@ widgets:
 footer:
   since: 2023
   count: true
+  icp:
+    enable: true
+    icon: ""
+    icpnumber: "吉ICP备2024011374号" # ICP备案号
+    beian: ""
+    recordcode: ""
 post:
   count: true
 

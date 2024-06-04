@@ -167,4 +167,4 @@ theme: shokax
 deploy:
   type: git
   repo: 
-    hexo: git@8.137.76.16:/var/repo/blog.git,master
+    hexo: root@8.137.76.16:/var/repo/blog.git,master
