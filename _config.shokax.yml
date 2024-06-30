@@ -29,9 +29,6 @@ seo:
   google: HVbd_neHe-ZPmmR_IUzIfLkUgw0aC0gV_H4GvFy6m24
   baidu: baea07cdd156d06fbf27702460bf3804
 
-visitor:
-  baiduAnalytics: codeva-7m2zuOkfuy
-
 modules:
   unlazyHash: true
   visibilityListener: false
@@ -51,3 +48,7 @@ menu:
 
 reward:
   enable: false
+
+vendors:
+  css:
+    fancybox: https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css
