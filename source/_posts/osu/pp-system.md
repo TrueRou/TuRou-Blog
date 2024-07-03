@@ -1,5 +1,5 @@
 ---
-title: 深入浅出剖析osu!的PP算法
+title: PP究竟是如何算出来的? 剖析osu!的PP算法!
 date: 2024-07-01 9:29:59
 categories: [osu]
 tags:
@@ -185,7 +185,7 @@ let mut aim_strain = curr_vel;
 
 表示当前物件与上一物件的标准化距离, 单位为osu!pixel
 
-计算方式为: normalize(`||当前物件的位置 - 上一物件的位置||`)
+计算方式为: `normalize(||当前物件的位置 - 上一物件的位置||)`
 
 > [osu!pixel](https://osu.ppy.sh/wiki/zh/Client/Playfield)的区域为(0, 0)到(512, 384), 在实际游玩中会根据分辨率进行缩放.
 >
@@ -460,7 +460,7 @@ if prev_vel.max(curr_vel).not_eq(0.0) {
 
 `(prev_vel - curr_vel).abs()` 计算了前后两个物件的速度大小的差值.
 
-`(125.0 / osu_curr_obj.strain_time.min(osu_last_obj.strain_time))` 主要是对距离对速度的影响进行了限制.
+`(125.0 / osu_curr_obj.strain_time.min(osu_last_obj.strain_time))` 主要是限制了距离对速度的影响.
 
 限制可以确保在计算速度变化时, 只考虑在一定范围内的速度变化. 使奖励值更加关注较近的对象之间的速度变化, 而忽略较远对象之间的变化.
 
@@ -522,7 +522,7 @@ aim_strain
 
 这些常量的取值没有逻辑上的意义, 只是一种迎合玩家心理的标准化手段.
 
-除常量外, 还有一些计算引起了我们的兴趣, 第一是滑条奖励的计算, 还是比较简单粗暴的: `滑条距离 / 滑条时间`.
+除常量外, 还有一些计算引起了我们的兴趣, 第一是滑条奖励的计算, 是比较简单粗暴的: `滑条距离 / 滑条时间`.
 
 这类滑条奖励主要将作用于拥有高速长滑条的一些谱面 (类似源流懐古那种), 偏Tech类的基本上增益不到.
 
