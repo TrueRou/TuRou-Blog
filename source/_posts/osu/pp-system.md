@@ -227,7 +227,7 @@ let mut aim_strain = curr_vel;
 
 这里客观来讲, extend velocity更能表现出**滑条1与圆圈2组合**的速度.
 
-## 锐角与钝角排列
+## 锐角与广角排列
 
 在上一部分, 我们根据速度计算出了Strain的基础值, 接下来PP算法考虑了经典的锐角和钝角Pattern, 计算出了有针对性的奖励系数.
 
@@ -285,7 +285,7 @@ if osu_curr_obj.strain_time.max(osu_last_obj.strain_time)
 
 ### 节奏判断
 
-在最外层进行了节奏的判断, 只有符合条件的物件会得到额外的Bonus. 这里主要是锐角和钝角的Bonus.
+在最外层进行了节奏的判断, 只有符合条件的物件会得到额外的Bonus. 这里主要是锐角和广角的Bonus.
 
 首先, 算法先保证了节奏变化幅度不大, 限制当前物件与上一物件的**间隔时间变化在25%以内**.
 
@@ -308,7 +308,7 @@ fn calc_acute_angle_bonus(angle: f64) -> f64 {
 }
 ```
 
-接下来, 算法根据物件之间角度的数值, 计算出了钝角和锐角增益的基础值, 范围为0 ~ 1.
+接下来, 算法根据物件之间角度的数值, 计算出了广角和锐角增益的基础值, 范围为0 ~ 1.
 
 `((5.0 / 6.0 * PI).min(angle.max(PI / 6.0)) - PI / 6.0)` 计算了角度与`π/6`的偏移值.
 
@@ -316,11 +316,13 @@ fn calc_acute_angle_bonus(angle: f64) -> f64 {
 
 `sin²(偏移值)` 将结果限制到0 ~ 1之间
 
-使用GeoGebra可以画出下面这样的曲线, 红线代表钝角曲线, 蓝色代表锐角曲线.
+使用GeoGebra可以画出下面这样的曲线, 红线代表广角曲线, 蓝色代表锐角曲线.
 
 ![Snipaste_2024-07-02_21-42-25.png](https://s2.loli.net/2024/07/02/8i6cwDeaE2trk57.png){width="720px"}
 
-在客观角度考虑, 30度以上, 钝角增益系数随角度平滑增长. 150度以下, 锐角增益系数随角度平滑增长, 是很自然的设计.
+在客观角度考虑, 30度以上, 广角增益系数随角度平滑增长. 150度以下, 锐角增益系数随角度平滑增长, 是很自然的设计.
+
+> 很明显地, 算法有意将30度以下的角度视作锐角, 将30度以上的角度视为广角, 我们常说的直角、钝角Pattern实际上都归属于广角的领域.
 
 ### 锐角增益计算
 
@@ -332,7 +334,7 @@ fn calc_acute_angle_bonus(angle: f64) -> f64 {
 
 > 可能有读者对 acute_angle_bonus 置为 0 有疑问, 在下文的讲解中, 这个顾虑便会消失.
 >
-> 实际上, 最终增益系数的值是选取锐角和钝角增益的**较大者**, 也就说一个物件要么被认为是钝角、要么被认为是锐角.
+> 实际上, 最终增益系数的值是选取锐角和广角增益的**较大者**, 也就说一个物件要么被认为是广角、要么被认为是锐角.
 
 ```rust
 let base1 =
@@ -384,7 +386,7 @@ acute_angle_bonus *= 0.5
 
 经过逻辑分析后, 我们可以将惩罚的关键部分抽象为`1.0 - f(x)`, f(x)的增大意味着受到更大的惩罚.
 
-这里通过比较最后一个角度的Bonus, 可以间接地对重复的钝角进行惩罚.
+这里通过比较最后一个角度的Bonus, 可以间接地对重复的广角进行惩罚.
 
 如果最后一个角度更锐利, 惩罚因子f(x)会减小, 从而对重复的宽角度施加更轻微的惩罚, 间接地处理重复的角度情况.
 
@@ -394,15 +396,15 @@ acute_angle_bonus *= 0.5
 
 ## 速度变化
 
-上一部分我们针对锐角和钝角排列进行了奖励, 其前提是速度相近, 即速度变化在25%以内.
+上一部分我们针对锐角和广角排列进行了奖励, 其前提是速度相近, 即速度变化在25%以内.
 
 下面我们将引入速度变化奖励, 这次与上文有着相反的前提, 即速度一定要有不同, 我们将采用与上一节类似的策略来分析.
 
-这里我们按照注释, 将代码分为三部分: 基础值计算、重叠奖励、时间惩罚.
+这里我们按照注释, 将代码分为三部分: 比率计算、基数计算、节奏变化惩罚.
 
 ```rust
 if prev_vel.max(curr_vel).not_eq(0.0) {
-    // * (基础值计算)
+    // * (比率计算)
     // * We want to use the average velocity over the whole object when awarding
     // * differences, not the individual jump and slider path velocities.
     prev_vel = (osu_last_obj.lazy_jump_dist + osu_last_last_obj.travel_dist)
@@ -415,20 +417,121 @@ if prev_vel.max(curr_vel).not_eq(0.0) {
         (FRAC_PI_2 * (prev_vel - curr_vel).abs() / prev_vel.max(curr_vel)).sin();
     let dist_ratio = dist_ratio_base.powf(2.0);
 
-    // * Reward for % distance up to 125 / strainTime for overlaps where velocity is still changing. (重叠奖励)
+    // * Reward for % distance up to 125 / strainTime for overlaps where velocity is still changing. (基数计算)
     let overlap_vel_buff = (125.0 / osu_curr_obj.strain_time.min(osu_last_obj.strain_time))
         .min((prev_vel - curr_vel).abs());
 
     vel_change_bonus = overlap_vel_buff * dist_ratio;
 
-    // * Penalize for rhythm changes. (时间惩罚)
+    // * Penalize for rhythm changes. (节奏变化惩罚)
     let bonus_base = (osu_curr_obj.strain_time).min(osu_last_obj.strain_time)
         / (osu_curr_obj.strain_time).max(osu_last_obj.strain_time);
     vel_change_bonus *= bonus_base.powf(2.0);
 }
 ```
 
-### 基础值计算
+### 比率计算
+
+在代码的后半部分, 我们可以看到`vel_change_bonus = overlap_vel_buff * dist_ratio`.
+
+即最终速度变化奖励是利用`基数 * 比率`的方式进行计算的, 这里我们先来看比率的计算方式.
 
 首先, 针对`prev_vel`和`curr_vel`进行了重算, 使用了之前图1中**绿色**的部分作为速度值.
 
+接下来, `dist_ratio`与上文计算角度奖励的方式类似, 都采用先正弦再平方的方式, 很明显地, `dist_ratio`的取值范围为`[0, 1]`
+
+`(prev_vel - curr_vel).abs() / prev_vel.max(curr_vel)` 计算了速度变化的大小相对于最大速度的比例, 反应了速度变化的剧烈程度.
+
+速度变化的**剧烈程度**作为速度奖励的**比率**, 在合适不过了.
+
+> (a - b).abs() / a.max(b) 是一种特征缩放方式, 可以将任意量纲的数值范围缩放到 [0, 1] 区间里.
+>
+> ![Snipaste_2024-07-03_10-46-29.png](https://s2.loli.net/2024/07/03/Ez5Aqb7N1nB4R8g.png){width="720px"}
+>
+> 这里x, y可分别看作当前物件与上一物件的速度, 而z值则为归一化后的速度变化.
+
+> 上文两次提到的先正弦再平方实际上也是一种特征映射的方式, 可以将原始值 x 映射到 [0, 1] 的范围内，并且平方操作可以增强映射后的值的变化幅度.
+>
+> 这里考虑到的变化幅度, 读者不妨考虑正弦函数各点的斜率(导数), 其变化幅度便一目了然了.
+
+### 基数计算
+
+很明显, 这里直接使用了速度变化的大小作为基数的值.
+
+`(prev_vel - curr_vel).abs()` 计算了前后两个物件的速度大小的差值.
+
+`(125.0 / osu_curr_obj.strain_time.min(osu_last_obj.strain_time))` 主要是对距离对速度的影响进行了限制.
+
+限制可以确保在计算速度变化时, 只考虑在一定范围内的速度变化. 使奖励值更加关注较近的对象之间的速度变化, 而忽略较远对象之间的变化.
+
+### 时间变化惩罚
+
+这里时间变化惩罚也运用了类似的归一化手段. bonus_base(这里其实理解为penalize_base)的取值范围为[0, 1].
+
+我们画出bonus_base的图象, 这里x, y轴为strain_time, z轴为bonus_base的值: 
+
+![Snipaste_2024-07-03_10-56-15.png](https://s2.loli.net/2024/07/03/BseojKufnCkFx7g.png){width="720px"}
+
+可以明显地看到, 当strain_time不变时, 几乎没有惩罚(bonus_base值为1).
+
+当strain_time出现变化时, 我们假定一个横纵坐标, 都有一个较小的bonus_base与其对应. **时间变化越大时, 惩罚越大**.
+
+> 注: 因为x, y轴strain_time可以等比缩放, 这里都设置为了1方便查看.
+
+读者可能不容易理解, 为什么要针对时间变化进行惩罚呢, 这里我们举出游戏中的一个例子: 
+
+![Snipaste_2024-07-03_11-16-25.png](https://s2.loli.net/2024/07/03/FSKkcRu4Qd71YvJ.png){width="720px"}
+
+我们将**圆圈3**作为当前物件, 这里**圆圈2**就是上一物件, 计算**圆圈3**的速度变化奖励将利用二者的速度.
+
+圆圈3的速度利用绿线计算, 属于间距小时间长, 速度必然很小.
+
+圆圈2的速度利用红线计算, 属于间距大时间短, 速度必然很大.
+
+在不引入时间变化惩罚的情况下, 算法将认为圆圈3的难度较高, 因为出现了较大的速度变化.
+
+但实际上在玩家游玩中, 因为圆圈3与上一物件有较长的时间间隔, 所以已经感受不出速度变化了, 此时**圆圈3**的难度很低.
+
+客观上来说, 如果我们将1, 2, 3, 4的时间轴拖拽均匀, 那么这是一段较难的排列, 玩家点击**圆圈3**时需要一定的aim control能力.
+
+## 基值 *= 奖励
+
+```rust
+if osu_last_obj.base.is_slider() {
+    // * Reward sliders based on velocity.
+    slider_bonus = osu_last_obj.travel_dist / osu_last_obj.travel_time;
+}
+
+// * Add in acute angle bonus or wide angle bonus + velocity change bonus, whichever is larger.
+aim_strain += (acute_angle_bonus * Self::ACUTE_ANGLE_MULTIPLIER).max(
+    wide_angle_bonus * Self::WIDE_ANGLE_MULTIPLIER
+        + vel_change_bonus * Self::VELOCITY_CHANGE_MULTIPLIER,
+);
+
+// * Add in additional slider velocity bonus.
+if with_sliders {
+    aim_strain += slider_bonus * Self::SLIDER_MULTIPLIER;
+}
+
+aim_strain
+```
+
+在上面的部分中, 我们已经将最终计算所需的各类奖励值和基础值计算好了, 总算要到最终计算`aim_strain`的时刻了.
+
+首先映入我们眼帘的是一些定义好的常量 (以全大写和下划线命名), 这些常量规定了各增益在最终计算中的占比.
+
+这些常量的取值没有逻辑上的意义, 只是一种迎合玩家心理的标准化手段.
+
+除常量外, 还有一些计算引起了我们的兴趣, 第一是滑条奖励的计算, 还是比较简单粗暴的: `滑条距离 / 滑条时间`.
+
+这类滑条奖励主要将作用于拥有高速长滑条的一些谱面 (类似源流懐古那种), 偏Tech类的基本上增益不到.
+
+另外, `aim_strain`取用锐角、广角、速度增益的方式也比较有意思, 这里是取**锐角** 或 **广角 + 速度**中的**较大者**.
+
+在上文我们提过, 锐角增益的应用条件是很苛刻的 (300BPM的跳, 150BPM的串), 这也导致了大部分的物件是不会吃到锐角奖励的.
+
+在查看常量的取值后我们发现, 针对锐角增益的乘数是大于广角增益的乘数的, 这为一些高难度、苛刻的Pattern提供了更高的奖励.
+
+简单来说, 大部分的物件奖励值都来源于**广角 + 速度**的计算公式, 一些常见的谱面甚至没有机会吃到**锐角**奖励.
+
+# 探索Speed Skill
