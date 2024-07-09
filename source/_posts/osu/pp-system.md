@@ -535,3 +535,76 @@ aim_strain
 简单来说, 大部分的物件奖励值都来源于**广角 + 速度**的计算公式, 一些常见的谱面甚至没有机会吃到**锐角**奖励.
 
 # 探索Speed Skill
+
+同样的, 我们首先来关注speed.rs中, 针对Speed的ISkill实现`impl<'a> Skill<'a, Speed>`, 将重点放在`strain_value_at`方法
+
+```rust
+fn strain_value_at(&mut self, curr: &'a OsuDifficultyObject<'a>) -> f64 {
+        self.inner.curr_strain *= strain_decay(curr.strain_time, STRAIN_DECAY_BASE);
+        self.inner.curr_strain +=
+            SpeedEvaluator::evaluate_diff_of(curr, self.diff_objects, self.inner.hit_window)
+                * SKILL_MULTIPLIER;
+        self.inner.curr_rhythm =
+            RhythmEvaluator::evaluate_diff_of(curr, self.diff_objects, self.inner.hit_window);
+
+        let total_strain = self.inner.curr_strain * self.inner.curr_rhythm;
+        self.inner.object_strains.push(total_strain);
+
+        total_strain
+    }
+}
+```
+
+经过粗略的阅读, 我们发现了此处与上文Aim计算略微不同的地方. 这里将`curr_strain(speed_strain)`作为基值, 而`curr_rhythm`作为因数, 速度与节奏复杂度相乘作为最终的值.
+
+> 目前的节奏复杂度算法由Xexxar在2021年引入: [osu! Rhythm Complexity SR & PP Rework](https://github.com/ppy/osu/pull/14395)
+
+> abraker95在2019年提出过一套节奏复杂度的理论: [On the topic of rhythmic complexity](https://docs.google.com/document/d/1YjgfXKzz-8RpWkIT572qH_9fjCL6JltQEhf-BbQgJg4)
+
+> 2019年, 社区针对节奏复杂度的理解和讨论: [Rhythmic Complexity](https://github.com/ppy/osu-performance/issues/89)
+
+## SpeedEvaluator
+
+### Doubletappable
+
+```rust
+if curr.base.is_spinner() {
+    return 0.0;
+}
+
+// * derive strainTime for calculation
+let osu_curr_obj = curr;
+let osu_prev_obj = curr.previous(0, diff_objects);
+let osu_next_obj = curr.next(0, diff_objects);
+
+let mut strain_time = curr.strain_time;
+let mut doubletapness = 1.0;
+
+// * Nerf doubletappable doubles.
+if let Some(osu_next_obj) = osu_next_obj {
+    let curr_delta_time = osu_curr_obj.delta_time.max(1.0);
+    let next_delta_time = osu_next_obj.delta_time.max(1.0);
+    let delta_diff = (next_delta_time - curr_delta_time).abs();
+    let speed_ratio = curr_delta_time / curr_delta_time.max(delta_diff);
+    let window_ratio = (curr_delta_time / hit_window).min(1.0).powf(2.0);
+    doubletapness = speed_ratio.powf(1.0 - window_ratio);
+}
+```
+
+> 注: `if let Some(osu_next_obj) = osu_next_obj`是rust的非空解构语法. 
+
+这里前面的基础值我们不再赘述, 我们将重点放在`doubletappable doubles`部分.
+
+---
+
+我们首先对代码中出现的`hit_window`概念进行解释: HitWindow是完成物件打击的时间窗口期. 与谱面的OD息息相关. 在游戏内将光标悬停在左上角的谱面三维位置可以看到窗口期(单位为ms).
+
+osu!standard模式的计算方式: 
+
+![Snipaste_2024-07-08_13-29-04.png](https://s2.loli.net/2024/07/08/FR6DjZHcleKgyY3.png)
+
+> 这里推荐阅读osu!Wiki: [判定严度 (Overall difficulty)](https://osu.ppy.sh/wiki/zh/Beatmap/Overall_difficulty)
+
+---
+
+`delta_diff`诠释了两段时间间隔的差值.
