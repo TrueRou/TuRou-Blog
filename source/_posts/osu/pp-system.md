@@ -661,10 +661,32 @@ speed_bonus是从75ms开始的(200BPM), dist是从125osu!pixel开始的, 总体�
 
 ![Figure_1.png](https://s2.loli.net/2024/09/17/bAEjJxSapdctTfw.png)
 
-对于dist的计算, 这里与AIM中的velocity extends概念非常相似, 这里我们重新引入作为例子的图片:
+对于dist的计算, 这里与Aim中的velocity extends概念非常相似, 这里我们重新引入作为例子的图片:
 
 ![](https://s2.loli.net/2024/07/02/WBSebI6OzCKnd3a.png){width="720px"}
 
 请读者将**圆圈2**当做当前物件, 这里**圆圈2**的dist就是红色距离与橙色距离的和
 
 ## RhythmEvaluator
+
+由于RhythmEvaluator较为复杂, 这里我们先对原理进行总体而粗略的解释, 再结合代码分析.
+
+首先, RhythmEvaluator本身与上文的AimEvaluator, SpeedEvaluator无异, 都是针对**具有上下文的单个物件**算出的值.
+
+节奏复杂度围绕`effectiveRatio`这个参数展开, effectiveRatio会根据初始节奏变化得到一个值, 再通过组间评分的方式进行削弱.
+
+### 组间评分
+
+这里, 我们利用比较通俗的语言模拟一下组间评分的过程:
+
+首先, 先寻找当前物件**5s内**的**0~32个历史物件**, 最终会脱颖而出`rhythmStart`个历史物件
+
+接下来, 我们会按顺序遍历这些个历史物件, 尝试在遍历中进行分组(`island`), 分组依据是节奏发生了较大幅度变化(`deltaTime`变化超出25%)
+
+遍历过后, 所有的历史物件都应该被分好了自己的小组(`island`), 小组人数为1~8人, 但可以容纳超过8人, 超出的部分也记作8
+
+最后, 我们要在小组(`island`)间进行评分, 人数相等的小组(xxx-xxx), 人数奇偶相同的小组(xx-xxxx), 就要被削弱了
+
+示意图：
+
+![Snipaste_2024-09-17_01-23-45.png](https://s2.loli.net/2024/09/17/gEfGa1UADmCHtxL.png)
