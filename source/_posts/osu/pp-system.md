@@ -540,22 +540,25 @@ aim_strain
 
 ```rust
 fn strain_value_at(&mut self, curr: &'a OsuDifficultyObject<'a>) -> f64 {
-        self.inner.curr_strain *= strain_decay(curr.strain_time, STRAIN_DECAY_BASE);
-        self.inner.curr_strain +=
-            SpeedEvaluator::evaluate_diff_of(curr, self.diff_objects, self.inner.hit_window)
-                * SKILL_MULTIPLIER;
-        self.inner.curr_rhythm =
-            RhythmEvaluator::evaluate_diff_of(curr, self.diff_objects, self.inner.hit_window);
+    self.inner.curr_strain *= strain_decay(curr.strain_time, STRAIN_DECAY_BASE);
+    self.inner.curr_strain +=
+        SpeedEvaluator::evaluate_diff_of(curr, self.diff_objects, self.inner.hit_window)
+            * SKILL_MULTIPLIER;
+    self.inner.curr_rhythm =
+        RhythmEvaluator::evaluate_diff_of(curr, self.diff_objects, self.inner.hit_window);
 
-        let total_strain = self.inner.curr_strain * self.inner.curr_rhythm;
-        self.inner.object_strains.push(total_strain);
+    let total_strain = self.inner.curr_strain * self.inner.curr_rhythm;
+    self.inner.object_strains.push(total_strain);
 
-        total_strain
-    }
+    total_strain
 }
 ```
 
-经过粗略的阅读, 我们发现了此处与上文Aim计算略微不同的地方. 这里将`curr_strain(speed_strain)`作为基值, 而`curr_rhythm`作为因数, 速度与节奏复杂度相乘作为最终的值.
+经过粗略的阅读, 我们发现了此处与上文Aim计算略微不同的地方. 这里将`curr_strain(speed_strain)`作为基值, 而`curr_rhythm`作为因数, 速度与节奏复杂度相乘作为最终的值, 所以我们下文主要分为SpeedEvaluator和RhythmEvaluator两个板块
+
+此处的**节奏复杂度**(RhythmEvaluator)就是在[2021年11月 Rework](https://osu.ppy.sh/home/news/2021-11-09-performance-points-star-rating-updates)由Xexxar引入的概念.
+
+这次Rework备受关注和争议, 但一定程度上避免了AIM成为主要获取PP的方式, 将osu!从打地鼠模拟器的边缘拉了回来 (笔者个人理解), 下文我们会着重介绍这部分.
 
 > 目前的节奏复杂度算法由Xexxar在2021年引入: [osu! Rhythm Complexity SR & PP Rework](https://github.com/ppy/osu/pull/14395)
 
@@ -563,23 +566,33 @@ fn strain_value_at(&mut self, curr: &'a OsuDifficultyObject<'a>) -> f64 {
 
 > 2019年, 社区针对节奏复杂度的理解和讨论: [Rhythmic Complexity](https://github.com/ppy/osu-performance/issues/89)
 
+接下来, 我们还是按照代码的顺序来逐个介绍每一块内容.
+
 ## SpeedEvaluator
 
-### Doubletappable
+在开始介绍SpeedEvaluator之前, 我们先对一些概念进行补充:
+
+`hit_window`: HitWindow是完成物件打击的时间窗口期, 与谱面的OD息息相关 (注意, rosu-pp中所有提到的`hit_window`均为整段hit_window, 即下面的计算公式 * 2).
+
+在游戏内将光标悬停在左上角的谱面三维位置可以看到窗口期(单位为ms), osu!standard模式有这样的计算方式:
+
+![Snipaste_2024-07-08_13-29-04.png](https://s2.loli.net/2024/07/08/FR6DjZHcleKgyY3.png)
+
+> 这里推荐阅读osu!Wiki: [判定严度 (Overall difficulty)](https://osu.ppy.sh/wiki/zh/Beatmap/Overall_difficulty)
+
+### 单拍？双按！
+
+算法总是需要跟随谱师的脑洞不断更新迭代, 有创新性的谱面经常能推动PP系统的更新, **doubletapness**就是这样被引入的
+
+引入**doubletapness**源于哪张谱面呢, 请看VCR (雾):
+
+![low_qualgif.gif](https://s2.loli.net/2024/09/16/ioh4fcxyztBLXqp.gif)
+
+仔细看的读者应该能发现，片段中多次出现需要双按的单拍, 这在Speed计算看来, 被判定为极高速的切, DTHR后更会使这种情况加剧.
+
+> 在**doubletapness**引入之前, 这张图DTHR后被给予了13星的超高难度 (目前为8.66星)
 
 ```rust
-if curr.base.is_spinner() {
-    return 0.0;
-}
-
-// * derive strainTime for calculation
-let osu_curr_obj = curr;
-let osu_prev_obj = curr.previous(0, diff_objects);
-let osu_next_obj = curr.next(0, diff_objects);
-
-let mut strain_time = curr.strain_time;
-let mut doubletapness = 1.0;
-
 // * Nerf doubletappable doubles.
 if let Some(osu_next_obj) = osu_next_obj {
     let curr_delta_time = osu_curr_obj.delta_time.max(1.0);
@@ -591,20 +604,67 @@ if let Some(osu_next_obj) = osu_next_obj {
 }
 ```
 
-> 注: `if let Some(osu_next_obj) = osu_next_obj`是rust的非空解构语法. 
+`window_ratio`将**相邻两个物件**与300的`hit_window`相比较. 假定N是当前物件, 如果`delta(N, N-1)`比300的hitwindow小, 那么在(N-2, N-1)与(N-1, N)之间可以认为存在doubletapness的情况, 这里`window_ratio`是`doubletapness`的定性参数
 
-这里前面的基础值我们不再赘述, 我们将重点放在`doubletappable doubles`部分.
+`delta_diff`表明了本次间隔与下次间隔之间的差值. 这里我们以GIF中任意一个**圆圈2**举例, **圆圈2**的该值会非常大 (2与前一个1之间间隔非常短, 而与下一个1之间间隔非常长), 如果我们转而观察任意一个**圆圈1**, 可以得到相同的结论. 这里我们发现`delta_diff`就是衡量`doubletapness`的定量参数
 
----
+`speed_ratio`是衰减幅度的一部分. 意在将raw_doubletapness归一化到当前量纲
 
-我们首先对代码中出现的`hit_window`概念进行解释: HitWindow是完成物件打击的时间窗口期. 与谱面的OD息息相关. 在游戏内将光标悬停在左上角的谱面三维位置可以看到窗口期(单位为ms).
+> 这里提到的300的hitwindow, 可以利用上文的公式: `2(80 - 6 * OD)` 计算得到, 这里的2意味着我们考虑整段hitwindow, 包含正负段
+>
+> doubletapness由apollo-dw在2022年引入: [Rework doubletap detection in osu!'s Speed evaluator](https://github.com/ppy/osu/pull/18692)
+>
+> 感兴趣的读者可以到apollo-dw提供的图形计算机自己调整参数尝试: [Desmos](https://www.desmos.com/calculator/vr8nzfqo4b?lang=zh-CN)
 
-osu!standard模式的计算方式: 
 
-![Snipaste_2024-07-08_13-29-04.png](https://s2.loli.net/2024/07/08/FR6DjZHcleKgyY3.png)
+需要注意的是, 在2021年前后, **apollo-dw**推进了许多与Speed计算有关的提案, **doubletapness**修复只是**apollo-dw**伟大改革的一次未雨绸缪.
 
-> 这里推荐阅读osu!Wiki: [判定严度 (Overall difficulty)](https://osu.ppy.sh/wiki/zh/Beatmap/Overall_difficulty)
+**apollo-dw**的名字还会在下面的内容中出现.
 
----
+### 速度为底、距离为因
 
-`delta_diff`诠释了两段时间间隔的差值.
+```rust
+// * Cap deltatime to the OD 300 hitwindow.
+// * 0.93 is derived from making sure 260bpm OD8 streams aren't nerfed harshly, whilst 0.92 limits the effect of the cap.
+strain_time /= ((strain_time / hit_window) / 0.93).clamp(0.92, 1.0);
+
+// * derive speedBonus for calculation
+let speed_bonus = if strain_time < Self::MIN_SPEED_BONUS {
+    let base = (Self::MIN_SPEED_BONUS - strain_time) / Self::SPEED_BALANCING_FACTOR;
+
+    1.0 + 0.75 * base.powf(2.0)
+} else {
+    1.0
+};
+
+let travel_dist = osu_prev_obj.map_or(0.0, |obj| obj.travel_dist);
+let dist = Self::SINGLE_SPACING_THRESHOLD.min(travel_dist + osu_curr_obj.min_jump_dist);
+
+(speed_bonus + speed_bonus * (dist / Self::SINGLE_SPACING_THRESHOLD).powf(3.5))
+    * doubletapness
+    / strain_time
+```
+
+在计算的开头, 我们注意到了这个对于`strain_time`的限制操作, 他实际来源于**apollo-dw**的一个commit: [Remove speed caps in osu! difficulty calculation](https://github.com/ppy/osu/pull/14617)
+
+限制`strain_time`的本意是防止**高BPM低OD串**的谱面算出过高的星数, 同时推进移除旧算法直接限制Speed值的行为.
+
+这里考虑了物件之间的间隔时间是否小于300的hitwindow, 如果小于, 就会对strain_time进行削弱.
+
+> **apollo-dw**与**emu1337**通过上面提到的**doubletapness修复**和**限制strain_time**推进了[Remove speed caps in osu! difficulty calculation](https://github.com/ppy/osu/pull/14617)提案.
+>
+> 在2024年看来, 这些举动还是非常有前瞻性的, Wooting的出现大幅提升了头部玩家的高速串能力, 旧 ~333bpm 1/4 的限制移除是大势所趋
+
+speed_bonus是从75ms开始的(200BPM), dist是从125osu!pixel开始的, 总体趋势为速度越大, 距离越远, strain值越大.
+
+这里我们利用matplotlib绘制了`speed_bonus`关于`strain_time`的曲线提供给读者参考:
+
+![Figure_1.png](https://s2.loli.net/2024/09/17/bAEjJxSapdctTfw.png)
+
+对于dist的计算, 这里与AIM中的velocity extends概念非常相似, 这里我们重新引入作为例子的图片:
+
+![](https://s2.loli.net/2024/07/02/WBSebI6OzCKnd3a.png){width="720px"}
+
+请读者将**圆圈2**当做当前物件, 这里**圆圈2**的dist就是红色距离与橙色距离的和
+
+## RhythmEvaluator
