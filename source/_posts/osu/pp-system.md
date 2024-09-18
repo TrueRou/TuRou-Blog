@@ -697,7 +697,7 @@ speed_bonus是从75ms开始的(200BPM), dist是从125osu!pixel开始的, 总体�
 
 #### 筛选对象
 
-```c#
+```csharp
 int historicalNoteCount = Math.Min(current.Index, 32);
 int rhythmStart = 0;
 while (rhythmStart < historicalNoteCount - 2 && current.StartTime - current.Previous(rhythmStart).StartTime < history_time_max)
@@ -708,7 +708,7 @@ while (rhythmStart < historicalNoteCount - 2 && current.StartTime - current.Prev
 
 #### 进行分组
 
-```c#
+```csharp
 for (int i = rhythmStart; i > 0; i--)
 {
     // 省略了effectiveRatio初值的计算
@@ -770,7 +770,7 @@ for (int i = rhythmStart; i > 0; i--)
 
 #### 初值计算
 
-```c#
+```csharp
 double currHistoricalDecay = (history_time_max - (current.StartTime - currObj.StartTime)) / history_time_max; // scales note 0 to 1 from history to now
 
 currHistoricalDecay = Math.Min((double)(historicalNoteCount - i) / historicalNoteCount, currHistoricalDecay); // either we're limited by time or limited by object count.
@@ -784,6 +784,8 @@ windowPenalty = Math.Min(1, windowPenalty);
 double effectiveRatio = windowPenalty * currRatio;
 ```
 
+##### currHistoricalDecay
+
 在**进行分组**部分的代码展示中, 我们一笔带过了`rhythmComplexitySum`的计算, 其中引用了`currHistoricalDecay`这个概念.
 
 重新审视整个过程, 我们会针对**每一个物件**应用RhythmEvaluator, 在单一物件中提出Sum这种概念是很危险的, 我们需要将Sum平摊到每一个物件的strain上.
@@ -791,3 +793,46 @@ double effectiveRatio = windowPenalty * currRatio;
 最简单的方式是直接将`rhythmComplexitySum` / `rhythmStart`个数, 但这样显然并不明智. 所以在这里引入了`currHistoricalDecay`.
 
 `currHistoricalDecay`根据相差时间进行均匀的伸缩, 把Sum值平摊到0~N个历史物件中.
+
+##### effectiveRatio
+
+`currRatio`的表达式我们并不陌生, 
+
+`currRatio`的函数表达形式(先正弦再平方)我们并不陌生, 与Aim中曾提到的速度变化奖励不能说毫不相干，只能说一模一样.
+
+这里我们甚至可以引用上文的原文:
+
+> `(prev_vel - curr_vel).abs() / prev_vel.max(curr_vel)` 计算了速度变化的大小相对于最大速度的比例, 反应了速度变化的剧烈程度.
+>
+> 相同地, 这里也采用了先正弦再平方的方式进行因数的归一化, 有疑问的读者可以返回上文查看.
+>
+> **Xexxar**也放出了该公式的图形计算器: [Desmos](https://www.desmos.com/calculator/j6yykmbb6f)
+
+`windowPenalty`主要针对重叠的窗口进行惩罚, 这里的玩法类似于之前**apollo-dw**的`doubletapness`.
+
+#### 组间计算
+
+```csharp
+if (currObj.BaseObject is Slider) // bpm change is into slider, this is easy acc window
+    effectiveRatio *= 0.125;
+
+if (prevObj.BaseObject is Slider) // bpm change was from a slider, this is easier typically than circle -> circle
+    effectiveRatio *= 0.25;
+
+if (previousIslandSize == islandSize) // repeated island size (ex: triplet -> triplet)
+    effectiveRatio *= 0.25;
+
+if (previousIslandSize % 2 == islandSize % 2) // repeated island polartiy (2 -> 4, 3 -> 5)
+    effectiveRatio *= 0.50;
+
+if (lastDelta > prevDelta + 10 && prevDelta > currDelta + 10) // previous increase happened a note ago, 1/1->1/2-1/4, dont want to buff this.
+    effectiveRatio *= 0.125;
+```
+
+通过简单的阅读, 我们很容易发现组间削弱的逻辑, 同时我们也逐渐意识到节奏分组的优势与可行性所在.
+
+---
+
+至此, 我们已经通过AimEvaluator和SpeedEvaluator探索了osu!算法的设计逻辑和具体实现. 在探究的过程中, 笔者希望读者在满足了好奇心的同时, 对于音乐类游戏的算法体系有一些简单的理解和感悟. 在行文过程中, 我们也涉及到了诸如函数拟合、归一化等统计学知识, 希望对于启发读者进行数学相关研究有帮助.
+
+2024-07-01 至 2024-09-19, 兔肉献上.
