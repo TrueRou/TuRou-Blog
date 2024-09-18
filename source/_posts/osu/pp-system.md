@@ -558,7 +558,7 @@ fn strain_value_at(&mut self, curr: &'a OsuDifficultyObject<'a>) -> f64 {
 
 此处的**节奏复杂度**(RhythmEvaluator)就是在[2021年11月 Rework](https://osu.ppy.sh/home/news/2021-11-09-performance-points-star-rating-updates)由Xexxar引入的概念.
 
-这次Rework备受关注和争议, 但一定程度上避免了AIM成为主要获取PP的方式, 将osu!从打地鼠模拟器的边缘拉了回来 (笔者个人理解), 下文我们会着重介绍这部分.
+这次Rework备受关注和争议, 但一定程度上避免了Aim成为主要获取PP的方式, 将osu!从打地鼠模拟器的边缘拉了回来, 下文我们会着重介绍这部分.
 
 > 目前的节奏复杂度算法由Xexxar在2021年引入: [osu! Rhythm Complexity SR & PP Rework](https://github.com/ppy/osu/pull/14395)
 
@@ -673,7 +673,7 @@ speed_bonus是从75ms开始的(200BPM), dist是从125osu!pixel开始的, 总体�
 
 首先, RhythmEvaluator本身与上文的AimEvaluator, SpeedEvaluator无异, 都是针对**具有上下文的单个物件**算出的值.
 
-节奏复杂度围绕`effectiveRatio`这个参数展开, effectiveRatio会根据初始节奏变化得到一个值, 再通过组间评分的方式进行削弱.
+节奏复杂度围绕`effectiveRatio`这个参数展开. 首先, effectiveRatio会根据初始节奏变化得到一个基值, 再通过类似**组间评分**的方式进行削弱.
 
 ### 组间评分
 
@@ -681,12 +681,113 @@ speed_bonus是从75ms开始的(200BPM), dist是从125osu!pixel开始的, 总体�
 
 首先, 先寻找当前物件**5s内**的**0~32个历史物件**, 最终会脱颖而出`rhythmStart`个历史物件
 
-接下来, 我们会按顺序遍历这些个历史物件, 尝试在遍历中进行分组(`island`), 分组依据是节奏发生了较大幅度变化(`deltaTime`变化超出25%)
+接下来, 我们会按顺序遍历这些个历史物件, 尝试在遍历中对前后相邻的物件进行分组(`island`), 分组依据是节奏发生了较大幅度变化(`deltaTime`变化超出25%)
 
-遍历过后, 所有的历史物件都应该被分好了自己的小组(`island`), 小组人数为1~8人, 但可以容纳超过8人, 超出的部分也记作8
+遍历过后, 所有的历史物件都应该被分好了自己的小组(`island`), 小组人数为1~8人. 小组可以容纳超过8个物件, 但小组人数只会被记作8
 
-最后, 我们要在小组(`island`)间进行评分, 人数相等的小组(xxx-xxx), 人数奇偶相同的小组(xx-xxxx), 就要被削弱了
+最后, 我们要在小组(`island`)间进行评分, 当某些Pattern出现时, `effectiveRatio`值会被削弱, 例如: 人数相等的小组重复出现(xxx-xxx), 前后小组人数奇偶相同(xx-xxxx)等等
 
-示意图：
+示意图 (图片部分来自**emu1337**的截图): 
 
 ![Snipaste_2024-09-17_01-23-45.png](https://s2.loli.net/2024/09/17/gEfGa1UADmCHtxL.png)
+
+### 实现细节
+
+接下来我们将结合代码对提到的组间评分过程进行分析, 需要注意的是, 这里为了提高可读性, 选择了C#版本的代码.
+
+#### 筛选对象
+
+```c#
+int historicalNoteCount = Math.Min(current.Index, 32);
+int rhythmStart = 0;
+while (rhythmStart < historicalNoteCount - 2 && current.StartTime - current.Previous(rhythmStart).StartTime < history_time_max)
+    rhythmStart++;
+```
+
+相信这里看到`rhythmStart`, 读者应该并不陌生, 我们在此处完成了寻找当前物件**5s内**的**0~32个历史物件**的操作.
+
+#### 进行分组
+
+```c#
+for (int i = rhythmStart; i > 0; i--)
+{
+    // 省略了effectiveRatio初值的计算
+
+    if (firstDeltaSwitch)
+    {
+        if (!(prevDelta > 1.25 * currDelta || prevDelta * 1.25 < currDelta))
+        {
+            if (islandSize < 7)
+                islandSize++; // island is still progressing, count size.
+        }
+        else
+        {
+            // 省略了对于effectiveRatio的削弱计算
+
+            /*
+                将分组运算的结果累计到rhythmComplexitySum中, 后文我们会再提到
+                rhythmComplexitySum += Math.Sqrt(effectiveRatio * previousRatio) * currHistoricalDecay * Math.Sqrt(4 + islandSize) / 2 * Math.Sqrt(4 + previousIslandSize) / 2;
+                previousRatio = effectiveRatio;
+            */
+
+            previousIslandSize = islandSize; // log the last island size.
+
+            if (prevDelta * 1.25 < currDelta) // we're slowing down, stop counting
+                firstDeltaSwitch = false; // if we're speeding up, this stays true and we keep counting island size.
+
+            islandSize = 1;
+        }
+    }
+    else if (prevDelta > 1.25 * currDelta) // we want to be speeding up.
+    {
+        // Begin counting island until we change speed again.
+        firstDeltaSwitch = true;
+        previousRatio = effectiveRatio;
+        islandSize = 1;
+    }
+}
+```
+
+此处的代码段省略了部分值的计算过程, 让我们聚焦于island的分组依据和分组过程.
+
+首先, for循环让我们对所有的历史物件遍历, 显而易见的, `firstDeltaSwitch`是新小组产生的定性判据.
+
+一旦满足`prevDelta > 1.25 * currDelta`, 即deltaTime发生了加速25%的变化时, 算法认为应该生成一个新的小组了.
+
+在下一次循环中, 由于`firstDeltaSwitch`被置为`true`, 算法将走入第一个if分支中.
+
+显然, 第二个if分支决定了分组结果, 一旦`prevDelta > 1.25 * currDelta || prevDelta * 1.25 < currDelta`条件满足, 即速度发生了较大变化时, 当前小组将结束并进行结算(else分支).
+
+结算的过程就是我们在上文提到的小组(`island`)间进行评分的过程. 与伪代码描述不同的是, 在真实代码中, 分组与结算是接连完成的, 而不是先分组再结算的.
+
+很明显地, 结算时我们有意地储存了一些previousIsland的状态, 不难理解, 这是在为下一小组结算时**创建上下文**
+
+> 另外地, 这里`if (prevDelta * 1.25 < currDelta) firstDeltaSwitch = false;`也可能引起我们的注意, 结合注释, 可以理解这样做的目的.
+>
+> 当速度维持上涨趋势时, 小组可以接连被创建. 当速度不再上涨时, 定性判据将被复原, 直至下一次满足`prevDelta > 1.25 * currDelta`
+>
+> 敏锐的读者可能察觉到我们上文示意图中的错误, 实际上, 单调节奏不是被分为了一个大组, 而是很多人数为1的小组.
+
+#### 初值计算
+
+```c#
+double currHistoricalDecay = (history_time_max - (current.StartTime - currObj.StartTime)) / history_time_max; // scales note 0 to 1 from history to now
+
+currHistoricalDecay = Math.Min((double)(historicalNoteCount - i) / historicalNoteCount, currHistoricalDecay); // either we're limited by time or limited by object count.
+
+double currRatio = 1.0 + 6.0 * Math.Min(0.5, Math.Pow(Math.Sin(Math.PI / (Math.Min(prevDelta, currDelta) / Math.Max(prevDelta, currDelta))), 2)); // fancy function to calculate rhythmbonuses.
+
+double windowPenalty = Math.Min(1, Math.Max(0, Math.Abs(prevDelta - currDelta) - currObj.HitWindowGreat * 0.3) / (currObj.HitWindowGreat * 0.3));
+
+windowPenalty = Math.Min(1, windowPenalty);
+
+double effectiveRatio = windowPenalty * currRatio;
+```
+
+在**进行分组**部分的代码展示中, 我们一笔带过了`rhythmComplexitySum`的计算, 其中引用了`currHistoricalDecay`这个概念.
+
+重新审视整个过程, 我们会针对**每一个物件**应用RhythmEvaluator, 在单一物件中提出Sum这种概念是很危险的, 我们需要将Sum平摊到每一个物件的strain上.
+
+最简单的方式是直接将`rhythmComplexitySum` / `rhythmStart`个数, 但这样显然并不明智. 所以在这里引入了`currHistoricalDecay`.
+
+`currHistoricalDecay`根据相差时间进行均匀的伸缩, 把Sum值平摊到0~N个历史物件中.
