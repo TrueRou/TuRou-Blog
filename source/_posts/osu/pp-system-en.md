@@ -7,65 +7,79 @@ tags:
     - PP算法
 ---
 
-本文是笔者研究osu!戳泡泡模式PP算法的一个记录文章, 旨在帮助其他对PP算法感兴趣的玩家快速建立对PP算法的认知. 由于大部分内容是笔者的个人理解和经验谈, 可能存在错误或者偏差, 欢迎读者提出改进意见和补充内容.
+In this paper, we mainly investigate the PP algorithm in osu! standard ruleset, aiming to help other players who are interested in the PP algorithm to quickly build up their knowledge of the algorithm. 
 
-本文的代码片段来源于rosu-pp, rosu-pp是osu!lazer全模式算法的Rust实现, 也是目前最流行的PP计算库. 本文面向略有编程经验的读者, 读者不必深入了解Rust, 只需要具有本科级别的编程知识和数学知识即可理解本文内容.
+As most of the content is the author's personal understanding and experience, there may be errors or bias, readers are welcome to propose recommendations
 
-# 初探PP算法
+The code snippets in this article are derived from rosu-pp, a Rust performance implementation of osu!lazer, which is currently the most popular library for performance calculation. 
 
-## 两步式计算
+In addition, the article is intended for readers with minimal programming experience, who do not need in-depth knowledge of Rust.
 
-抛开复杂的算法不谈, 我们先来谈论一些表象. 在表面来看, PP系统会综合评估**谱面难不难**和**打的好不好**两个概念, 最终计算出一个PP数值.
+# A first look
 
-广泛存在的一个误区是PP系统会根据Replay来评判这两个概念, 这是一种错误的认知. 实际上, PP计算是**两步式**进行的, 第一步计算谱面难度(这一步通常自变量是所有物件和速度倍率), 第二步是根据第一步算出的**谱面难度**和以及一些**其他变量**(例如谱面的三维, 玩家Acc, Miss数, 最大Combo)共同计算出最终PP数值.
+## Two-step calculation
 
-不难想象, 第一步计算的时候我们主要在考虑物件之间相互影响产生的基值, 而第二步计算主要是根据玩家的表现在基值上进行倍率的调整. 这里我们举一个简单的例子, 曲奇在FDFD中取得了939PP的成绩, 而mrekk取得了926PP的成绩, Accolibed取得了640PP的成绩, 他们三人在第一步计算中算出的基值是**相同**的, 只是在第二步计算中产生了不同的倍率. 曲奇的准确度高于mrekk, 固取得了更高的acc_bonus. Accolibed掉了一个Miss, 固得到了miss_penalize. 最终形形色色的bonus和penalize在第二步作用在基值上, 算出了最终的数值.
+Instead of complex algorithms, let's talk about the surface first. Simply speaking, the PP system evaluates the concepts of **difficulty** of the beatmap and **how well** player plays.
 
-也正因如此, 在利用各种PP计算器来计算大量成绩的时候, 先按照谱面归类将大幅提高计算效率, 因为在没有开启调整速度的Mod的情况下, 第一步计算(这也是决速步骤)只用进行一次就足够了.
+There is a widespread misconception that the PP system evaluates these concepts based on replay, which is a false perception. In fact, the calculation is a **two-step process**.
 
-> 上文提到的误区实际上源自于玩家对算法的过度期待: Miss了简单的部分, SS了困难的部分, PP算法是无法分辨出这两个场景的. 这些场景只能被视为一个整体, 表现于上文提到的**其他变量**中, 影响第二步计算的各种倍率. 这也是各个PP计算器不需要提供Replay, 只需要提供最终结果, 就能计算出准确PP的原理所在.
+The first step is to calculate the **Beatmap Difficulty** (which is usually based on all the objects in beatmap)
 
-至此, 我们已经将PP计算的过程分为了两部分, 通常来说, 第一步被称为Difficulty计算, 第二步被称为Performance计算.
+The second step is to calculate the final PP value based on the **Beatmap Difficulty** calculated in the first step and a number of **other player variables** (e.g., Player Acc, Miss count, Max Combo).
+
+As you can imagine, the first step of the calculation takes into account the base value of the interaction between the objects, while the second step of the calculation is to adjust the multiplier according to the performance of the players on the base value. Let's take a simple example:
+
+Cookiezi scored 939PP in FDFD, while mrekk scored 926PP and Accolibed scored 640PP. All three of them have the **same** base value in the first step of the calculation, but different factors in the second step. Cookiezi hit more accurate than mrekk, and got a higher acc bonus. Accolibed dropped a miss, and got a miss penalize. In the end, all sorts of bonuses and penalizes were applied to the base value, and then, final value was calculated.
+
+For this reason, it is much more efficient to group the scores by beatmap first when calculating a large number of scores. since the first calculation (which is also the decisive speed step) is only performed once.
+
+> The misunderstanding mentioned above actually comes from the player's over-expectation of the algorithm: Miss the easy part, SS the hard part, the PP algorithm is not able to distinguish between these two scenarios. These scenarios can only be considered as a whole, and are expressed in the **player variables** mentioned above, which affect the multipliers calculated in the second step. This is the reason that calculators do not need you to provide a replay, but only the final result, in order to calculate the exact PP.
+
+So far, we have divided the process of PP calculation into two parts, generally speaking, the first step is called **Difficulty** calculation, and the second step is called **Performance** calculation.
 
 ![Snipaste_2024-07-01_11-34-12.png](https://s2.loli.net/2024/07/01/JE8c1DUvZdnLy7g.png)
 
-## Difficulty 与 Skills
+## Difficulty & Skills
 
-经过上文的探究, 我们明白了Difficulty的计算是重中之重, 是区分**谱面难不难**的关键. 
+After the above exploration, we understand that the calculation of **Difficulty** is the most important thing, which is the key to tell the difference among beatmaps
 
-osu!的设计者们有意识地从多个维度来评估谱面的难度, 在多年的逐步迭代中明确了Skills这个概念. 当然, 针对不同的模式, Skill分别有不同维度的定义.
+The designers of osu! intentionally evaluated difficulty in multiple dimensions, and the concept of **Skill** was clarified over many years of iteration.
 
-对于戳泡泡玩家而言, 戳泡泡模式的Skills应该至少包含了Aim和Speed这两个老生常谈的维度, 当然事实也是这样的, 可以参考下面的表格.
+As you know, osu! standard should include at least two skills, Aim and Speed, and of course, they do, as shown in the table below.
 
 - osu!standard: Aim, Speed, Flashlight
 - osu!mania: Strain
 - osu!catch: Movement
 - osu!taiko: Color, Rhythm, Stamina
 
-这里由于笔者对其他模式不甚了解, 这里我们主要将目光聚焦于osu!standard. 本文主要也将谈论Aim, Speed两个Skill.
+Since I don't know much about other modes, we will focus on osu!standard.
 
-## Skill 与 微积分?
+## Skill & Calculus?
 
-相信读者读到这里已经对Aim, Speed的具体计算非常感兴趣了, 但在正式开始之前, 我们先笼统地认识一下Skill的计算方式.
+I'm sure you're already very interested in the specific calculations of Aim, Speed, but before we get started, let's have a look at how **Skill** is formed.
 
-读者不妨设想一下, 对于一张时长几分钟的谱面, 我们应该如何计算他的难度呢? 实际上这个问题是困难的, 物件以时间为轴堆叠仅仅是一堆表示位置的数组, 是很难衡量困难与否的. 如果在本科期间修读过高等数学的读者可能对这个例子感到熟悉: 一个光滑的曲面本身可能是不规则的, 想要计算面积是很困难的, 但是如果将曲面无限细分, 将最小单位看作是一个正方体, 问题就很好解决了. 即整体的求解是困难的, 但是一个切片往往是容易求解的.
+Imagine a score that is a few minutes long, how should we calculate its difficulty? This is actually a difficult question, and it is hard to measure difficulty since objects stacked on a time axis are just arrays of positions.
 
-Skill的计算遵循了类似先*微分*后*积分*的过程, 在计算过程中, 物件被**细分**进行**单独对待**.
+Readers who have taken calculus may be familiar with this example: a smooth surface may be irregular and it is difficult to calculate the area, but if the surface is subdivided infinitely and the smallest unit is considered to be a square, the problem is easily solved. That is, the whole surface is difficult to solve, but a slice is often easy to solve.
 
-简单来说, 每个物件都可以算作一个表示难度的元素, 在PP系统中, 这个元素被称作是**Strain**. 某Skill数值的计算依托于一个Strain构成的**集合**. 最终Skill数值(例如: raw_aim, raw_speed), 实际上是对Strains进行积分(以某种方式累加)的结果.
+Skill calculation followed a similar process of **differentiation** followed by **integration**, in which objects are **divided** and **treated separately**.
 
-戳泡泡中, 大部分Pattern(例如: 锐角跳, 钝角跳)都是针对**Strain**展开的, 即我们在计算单个**Strain**的过程中区分这些Pattern, 并给出最终的Strain值. 在实际计算Strain的过程中, 我们可以拿到很多参数辅助我们, 决定"当前物件的难度".
+Simply speaking, each hitobject can be considered as an atom that represents the difficulty, which is called **strain** in PP system. The final skill value (e.g. raw_aim, raw_speed) is actually the result of integrating (somehow adding up) the strains.
 
-- osu_curr_obj, osu_last_obj, osu_last_last_obj: 拿到前后的物件
-- travel_dist, travel_time, strain_time, jump_dist: 距离, 时间等几何量、物理量
+In osu! standard, most of the patterns (e.g. acute jumps, obtuse jumps) are **Strain** specific, i.e. we separate these patterns in the process of calculating one specific **Strain**. In the actual calculation, we can get many variables (such as the following) to assist us in determining the "difficulty of the current object".
 
-我们会在之后的讲解中逐步接触和理解这些概念. 在之后的讲解中, 我们也将以Strain计算为重点, **自下而上**地剖析具体计算过程.
+- osu_curr_obj, osu_last_obj, osu_last_last_obj: Hit object context
+- travel_dist, travel_time, strain_time, jump_dist: Distance, time, and other geometric and physical variables.
 
-接下来, 我们将逐步探寻Aim, Speed两个Skill, 并且尝试阅读单个**Strain**是如何被计算的.
+We will approach these concepts in a step-by-step process in the following tutorials. Of course, in a bottom-up manner, we will focus on analyzing the process of **Strain** calculations.
 
-# 探索Aim Skill
+Next, we will explore Aim & Speed Skills and try to find out how a single **Strain** is calculated.
 
-在rosu-pp中, 我们可以在/osu/difficulty/skills目录找到所有Skill的定义和实现. 这里我们尝试开始阅读aim.rs的源代码
+# Explore Aim
+
+In rosu-pp, we can find skill definitions and implementations in the /osu/difficulty/skills folder.
+
+Now let's try to start reading the source code of aim.rs.
 
 ```rust
 impl<'a> Skill<'a, Aim> {
@@ -80,13 +94,11 @@ impl<'a> Skill<'a, Aim> {
 }
 ```
 
-在针对`Skill<'a, Aim>`的实现中, 最吸引我们注意的是`strain_value_at`方法, 因为`curr_strain`值正是从这里发源的.
+In the implementation for `Skill<'a, Aim>`, it is the `strain_value_at` method that attracts most of our attention, since it is here that the `curr_strain` value derives.
 
-在上文的解释中, 我们已经明确了一个概念: 在计算过程中, 物件被**细分**进行**单独对待**. 
+In the above explanation, we have clarified the concept of objects are **divided** and **treated separately**. So obviously, `strain_value_at` will be called multiple times, the param `curr` represents the object that will be calculated, and `self.diff_objects` is a reference to the list of all objects.
 
-所以显然, `strain_value_at`会被调用多次, 其参数curr表示将要被计算的某一物件, `self.diff_objects`是所有物件列表的一个引用.
-
-> `self.diff_objects`的存在是必要的, 因为在计算单个物件的时候, 我们需要获取该物件的**上下文**. 
+> `self.diff_objects` is necessary, since when evaluating one single object, we need to get the **context** of that object. 
 
 > ```rust
 > pub trait IDifficultyObject: Sized {
@@ -95,9 +107,9 @@ impl<'a> Skill<'a, Aim> {
 >    fn next<'a, D>(&self, forwards_idx: usize, diff_objects: &'a [D]) -> Option<&'a D> {}
 >}
 > ```
-> 简单阅读`IDifficultyObject`的定义, 相信读者已经明白`idx`, `diff_objects`的必要性和使用场景了.
+> By skimming the definition of `IDifficultyObject`, the imperative of `idx` and `diff_objects` is clear.
 
-接下来, 我们将目光放到`AimEvaluator::evaluate_diff_of`方法上, 我们将按行分块解释这个方法.
+Moving on, we'll turn our attention to the `AimEvaluator::evaluate_diff_of` method, where we'll explain in line-by-line chunks.
 
 ## osu_curr_obj
 
@@ -113,13 +125,11 @@ else {
 };
 ```
 
-这部分主要负责解构出`osu_curr_obj`, `osu_last_obj`, `osu_last_last_obj`. 
+This part is mainly in charge of deconstructing `osu_curr_obj`, `osu_last_obj`, `osu_last_last_obj` context by `diff_objects` and the idx stored in the object.
 
-利用`diff_objects`和对象储存的物件ID就可以还原出上一个物件与下一个物件.
+Obviously, when the object is a spinner, the method returns 0.0 and does not perform any subsequent calculations.
 
-这里很明显地, 当物件为转盘(Spinner)时, 方法将直接返回0.0, 不执行后续计算.
-
-## 距离/时间=速度
+## Distance/Time=Speed
 
 ```rust
 // * Calculate the velocity to the current hitobject, which starts
@@ -157,97 +167,97 @@ let mut vel_change_bonus = 0.0;
 let mut aim_strain = curr_vel;
 ```
 
-这部分的主要逻辑是利用距离除以时间算出速度, 并且把速度当做初始`aim_strain`值.
+The main logic of this section is to calculate the speed by dividing the distance by the time, and to use the speed as the initial `aim_strain` value.
 
-这里我们解释一些**基本概念**, 以便于具体理解这些参数:
+Here we will explain some terms, in order to better understand parameters.
 
 ---
 
 ### strain_time
 
-表示当前物件与上一物件的时间间隔, 单位为毫秒.
+Indicates the time interval between the current object and the previous object, in milliseconds.
 
-计算方式为: `当前物件的起始时间 - 上一物件的起始时间`.
+Calculated as: `Start time of current object - Start time of previous object`.
 
-也可以用下面的这种方式进行计算: `(60 / BPM) * 节拍细分 * 1000`.
+It can also be calculated in the following way: `(60 / BPM) * beat snapping * 1000`.
 
-对于大部分谱面, 符合下面这样的例子: 
+For most of the beatmap: 
 
-- 对于180BPM的跳: (60 / 180) * 1/2 * 1000 = 166.67ms.
-- 对于180BPM的串: (60 / 180) * 1/4 * 1000 = 83.34ms.
-- 对于200BPM的跳: (60 / 200) * 1/2 * 1000 = 150.00ms.
-- 对于200BPM的串: (60 / 200) * 1/4 * 1000 = 75.00ms.
+- For 180 BPM jump: (60 / 180) * 1/2 * 1000 = 166.67ms.
+- For 180 BPM stream: (60 / 180) * 1/4 * 1000 = 83.34ms.
+- For 200 BPM jump: (60 / 200) * 1/2 * 1000 = 150.00ms.
+- For 200 BPM stream: (60 / 200) * 1/4 * 1000 = 75.00ms.
 
-> 算法中规定, MIN_DELTA_TIME = 25.0, 即strain_time的最小值为25ms.
+> The algorithm specifies that MIN_DELTA_TIME = 25.0, i.e., the minimum value of strain_time is 25ms.
 >
-> 关于节拍细分的更多内容可以查看osu!Wiki: [音符时值 (Beat Snap Divisor)](https://osu.ppy.sh/wiki/zh/Client/Beatmap_editor/Beat_snap_divisor)
+> For more on beat snapping, check out osu!Wiki: [Beat snapping](https://osu.ppy.sh/wiki/en/Beatmapping/Beat_snapping)
 
 ### lazy_jump_dist
 
-表示当前物件与上一物件的标准化距离, 单位为osu!pixel
+Normalized distance between the current object and the previous object, in osu!pixel
 
-计算方式为: `normalize(||当前物件的位置 - 上一物件的位置||)`
+Calculated as: `normalize(||current object's position - previous object's position||)`
 
-> [osu!pixel](https://osu.ppy.sh/wiki/zh/Client/Playfield)的区域为(0, 0)到(512, 384), 在实际游玩中会根据分辨率进行缩放.
+> [osu!pixel](https://osu.ppy.sh/wiki/en/Client/Playfield) is an area from (0, 0) to (512, 384), and will be scaled based on the resolution in the actual gameplay..
 >
-> 物件的位置会进行标准化, 标准化的时候, 取圆圈物件的半径为50单位长度, 注: 此时会考虑CS.
+> The positions of the hit objects are normalized by treating the radius of the circle as 50 units, note: CS is taken into account.
 >
-> 同时也与作图的[堆叠度](https://osu.ppy.sh/wiki/zh/Beatmap/Stack_leniency)配置有关, 感兴趣的读者可以自行阅读相关代码
+> It is also related to the [Stack leniency](https://osu.ppy.sh/wiki/zh/Beatmap/Stack_leniency) of mapping, if you are interested in the details, you can read the relevant code.
 
 ### travel_dist
 
-表示**滑条物件**的滑行距离
+Indicates the sliding distance of the **slider object**.
 
 ### travel_time
 
-表示**滑条物件**的滑行时间
+Indicates the sliding time of the **slider object**.
 
 ### min_jump_time
 
-表示刨除滑行时间后, 当前物件与上一滑条**头**之间的时间间隔.
+Indicates the time interval between the current object and the previous slider **header** after subtracting the sliding time.
 
-**通常在上一物件为滑条的情形下使用**, 如果上一物件不是滑条, 该值与**strain_time**相等.
+**Usually used if the previous object is a slider**, if the previous object is not a slider, the value is **equal** to the **strain_time**.
 
 ### min_jump_dist
 
-表示刨除滑行距离后, 当前物件与上一滑条**尾**之间的距离.
+Indicates the distance between the current object and the previous slider **end** after subtracting the sliding distance.
 
-**通常在上一物件为滑条的情形下使用**, 如果上一物件不是滑条, 该值与**lazy_jump_dist**相等.
+**Usually used if the previous object is a slider**, if the previous object is not a slider, this value is **equal** to **lazy_jump_dist**.
 
 ---
 
-接下来我们返回到代码解析部分, 相信读者最感兴趣的就是extend velocity这部分, 我们画图来解释一下
+Now let's return to the code analysis part. I believe the most attractive part is the extend velocity, we will draw a graph to explain it
 
 ![](https://s2.loli.net/2024/07/02/WBSebI6OzCKnd3a.png){width="720px"}
 
-请读者将**圆圈2**当做当前物件, 很明显, 绿色的是第一步计算的`curr_vel`, 接下来, 进入if逻辑的判断.
+Now please consider **Circle 2** as the current object, obviously, the green part is the `curr_vel` calculated in the first step, and then, we will enter the if logic.
 
-因为上一个物件是滑条, 条件满足, 这里接下来会分别计算红色部分和橘色部分的速度, 并且求和, 与原`curr_vel`取最大值.
+Since the previous object is a slider, the condition is met, and the velocities of the red part and the orange part are then calculated and summed to maximize with the original `curr_vel`.
 
-很明显, 对于图中这种排列, 红色部分和橘色部分的速度和是大于绿色的, 故采用后续计算出的值作为`curr_vel`.
+Obviously, for this pattern, the sum of the velocities of the red part and the orange part is larger than that of the green part, so the subsequent value is used as the `curr_vel`.
 
-这里客观来讲, extend velocity更能表现出**滑条1与圆圈2组合**的速度.
+Objectively speaking, extend velocity is a better representation of the speed of **Slider 1 -> Circle 2**.
 
-## 锐角与广角排列
+## Acute wide angle pattern
 
-在上一部分, 我们根据速度计算出了Strain的基础值, 接下来PP算法考虑了经典的锐角和钝角Pattern, 计算出了有针对性的奖励系数.
+In the previous section, we calculated the base value of the strain based on the velocities, and in this section, the algorithm considers the typical acute and obtuse patterning to derive specific bonus.
 
-注: 此处的代码经过了一些删减、重新排序和提取, 在不改变逻辑的情况下提升了可读性.
+Note: The code here has been trimmed, reordered and extracted to improve readability without changing the logic.
 
-这里我们按照注释, 将代码分为四部分: 节奏判断、基础值计算、锐角增益计算、重复惩罚.
+Here we divide the code into four parts according to the annotations: Rhythm Judgment, Base Calculation, Acute Bonus Calculation, and Repeat Penalty.
 
 ```rust
-// * If rhythms are the same (节奏判断).
+// * If rhythms are the same (Rhythm Judgment).
 if osu_curr_obj.strain_time.max(osu_last_obj.strain_time)
     < 1.25 * osu_curr_obj.strain_time.min(osu_last_obj.strain_time)
 {
-    // * Rewarding angles, take the smaller velocity as base (基础值计算).
+    // * Rewarding angles, take the smaller velocity as base (Base Calculation).
     let angle_bonus = curr_vel.min(prev_vel);
 
     wide_angle_bonus = Self::calc_wide_angle_bonus(curr_angle);
     acute_angle_bonus = Self::calc_acute_angle_bonus(curr_angle);
 
-    // * Only buff deltaTime exceeding 300 bpm 1/2 (锐角增益计算).
+    // * Only buff deltaTime exceeding 300 bpm 1/2 (Acute Bonus Calculation).
     if osu_curr_obj.strain_time > 100.0 {
         acute_angle_bonus = 0.0;
     } else {
@@ -269,7 +279,7 @@ if osu_curr_obj.strain_time.max(osu_last_obj.strain_time)
             * base2.powf(2.0);
     }
 
-    // * (重复惩罚)
+    // * (Repeat Penalty)
 
     // * Penalize wide angles if they're repeated, reducing the penalty as the lastAngle gets more acute.
     wide_angle_bonus *= angle_bonus
@@ -284,15 +294,15 @@ if osu_curr_obj.strain_time.max(osu_last_obj.strain_time)
 }
 ```
 
-### 节奏判断
+### Rhythm Judgment
 
-在最外层进行了节奏的判断, 只有符合条件的物件会得到额外的Bonus. 这里主要是锐角和广角的Bonus.
+The rhythm is determined at the top level, so that only objects that meet the criteria will receive the extra bonuses.
 
-首先, 算法先保证了节奏变化幅度不大, 限制当前物件与上一物件的**间隔时间变化在25%以内**.
+First of all, the algorithm ensures that the rhythm change is small, limiting the time change between the current object and the previous object is **within 25%**.
 
-在客观角度考虑, Pattern存在的必要条件就是节奏变化幅度较小. 如果节奏变化太大就不能称为是Pattern了.
+Objectively speaking, a pattern can only be formed if the rhythm change is small. If the rhythm varies too much, it can't be called as pattern.
 
-### 基础值计算
+### Base Calculation
 
 ```rust
 wide_angle_bonus = Self::calc_wide_angle_bonus(curr_angle);
@@ -309,33 +319,31 @@ fn calc_acute_angle_bonus(angle: f64) -> f64 {
 }
 ```
 
-接下来, 算法根据物件之间角度的数值, 计算出了广角和锐角增益的基础值, 范围为0 ~ 1.
+Then, the algorithm calculates the base values for the wide-angle and acute-angle gains based on the angle between objects. This base value is in the range 0 ~ 1.
 
-`((5.0 / 6.0 * PI).min(angle.max(PI / 6.0)) - PI / 6.0)` 计算了角度与`π/6`的偏移值.
+`((5.0 / 6.0 * PI).min(angle.max(PI / 6.0)) - PI / 6.0)` Calculate the angle offset from `π/6`.
 
-`3/4 * 偏移值` 是在对定义域进行伸缩, 伸缩到(30, 150).
+`3/4 * 偏移值` Stretch the domain to (30, 150).
 
-`sin²(偏移值)` 将结果限制到0 ~ 1之间
+`sin²(偏移值)` Limit results to 0 ~ 1
 
-使用GeoGebra可以画出下面这样的曲线, 红线代表广角曲线, 蓝色代表锐角曲线.
+Using GeoGebra, we can draw the following graphs, with the red line representing the wide-angle curve and the blue line representing the acute-angle curve.
 
 ![Snipaste_2024-07-02_21-42-25.png](https://s2.loli.net/2024/07/02/8i6cwDeaE2trk57.png){width="720px"}
 
-在客观角度考虑, 30度以上, 广角增益系数随角度平滑增长. 150度以下, 锐角增益系数随角度平滑增长, 是很自然的设计.
+Above 30 degrees, the wide angle bonus grows smoothly with the angle. Below 150 degrees, the acute-angle bonus grows smoothly with the angle. Objectively, this is a natural design
 
-> 很明显地, 算法有意将30度以下的角度视作锐角, 将30度以上的角度视为广角, 我们常说的直角、钝角Pattern实际上都归属于广角的领域.
+> Obviously, the algorithm intentionally treats angles below 30 degrees as acute angles and angles above 30 degrees as wide angles, and what we often refer to as right-angle and obtuse-angle patterns actually fall into the realm of wide angles.
 
-### 锐角增益计算
+### Acute Bonus Calculation
 
-首先, 锐角增益中`osu_curr_obj.strain_time > 100.0`限制了只有300BPM以上的跳或者150BPM以上的串会被增益.
+First of all, `osu_curr_obj.strain_time > 100.0` limits only jumps over 300 BPM or stream over 150 BPM will be bonused **in acute-angle bonus**, which means that hit object won't get acute-angle bonus **in most cases**.
 
-这意味着**大部分的排列不会吃到锐角增益**. 这个结论很有意思, 也很符合逻辑. 300BPM以上的跳不必多说了.
+This is an interesting and logical conclusion. Needless to say, it's hard to jump at 300 BPM or more. Stream over 150 BPM may seem like an easy bonus, but consider this, streams less than 90 degrees require STRONG aim control abilities.
 
-这里150BPM的串看似几乎没有限制, 但是请读者考虑一下, 小于90度的串甚至已经进入了aim control的领域了.
-
-> 可能有读者对 acute_angle_bonus 置为 0 有疑问, 在下文的讲解中, 这个顾虑便会消失.
+> Some readers may have concerns about setting acute_angle_bonus to 0. These concerns will be addressed in the following sections.
 >
-> 实际上, 最终增益系数的值是选取锐角和广角增益的**较大者**, 也就说一个物件要么被认为是广角、要么被认为是锐角.
+> In fact, the final bonus is the greater of the acute and wide bonuses**, i.e. an object is considered either wide or acute.
 
 ```rust
 let base1 =
@@ -356,21 +364,21 @@ acute_angle_bonus *= Self::calc_acute_angle_bonus(last_angle)
     * base2.powf(2.0);
 ```
 
-这里英文注释为我们理解提供了极大便利.
+The comments here greatly facilitate our understanding.
 
-首先`*= Self::calc_acute_angle_bonus(last_angle)`, 这个操作实际上在**规避"离群值"**.
+`*= Self::calc_acute_angle_bonus(last_angle)` plays a role in circumventing outliers
 
-这里注释中提到, 只希望考虑摇摆型的锐角, 摇摆型可以理解为: 连续的几个物件都符合锐角的特征.
+As mentioned in the comments, the algorithm only wants to consider wiggly acute angles, which can be understood as several consecutive objects matching the characteristics of acute angle pattern.
 
-而偶然性的, 突发性的锐角不在增益范围, 这也是合情合理的, 这种突发性的锐角不应被视作Pattern.
+While casual and sudden acute is not included in the bonus range, which is reasonable, because it should not be considered as any pattern.
 
-接着, 对velocity, strain_time, distance分别进行了伸缩.
+Then, the algorithm scales velocity, strain_time, and distance: 
 
-base1的增益范围为: 150 ~ 200BPM的串 (1/4节拍)
+The bonus range of base1: 150 ~ 200 BPM stream (1/4 snapping)
 
-base2的增益范围为: 50 ~ 100单位 (互过圆心的物件 ~ 相切的物件)
+The bonus range of base2: 50 ~ 100 units (center of one circle lies on the circumference of another circle ~ tangent circle)
 
-### 重复惩罚
+### Repeat Penalty
 
 ```rust
 // * Penalize wide angles if they're repeated, reducing the penalty as the lastAngle gets more acute.
@@ -385,23 +393,25 @@ acute_angle_bonus *= 0.5
                 .min(Self::calc_acute_angle_bonus(last_last_angle).powf(3.0)));
 ```
 
-经过逻辑分析后, 我们可以将惩罚的关键部分抽象为`1.0 - f(x)`, f(x)的增大意味着受到更大的惩罚.
+After analysis, we can abstract the key part of the penalty as `1.0 - f(x)`, where an increase in f(x) implies a larger penalty.
 
-这里通过比较上一个Bonus, 可以间接地对重复的广角进行惩罚, 如果上一个角度更锐, 惩罚因子f(x)会减小, 从而对重复的广角施加更轻微的惩罚.
+Here the repeated wide angle can be penalized by comparing the last bonus.
 
-`min()` 选择较小的值作为惩罚因子, 这个比较是为了确保惩罚因子不会超过`wide_angle_bonus`的值.
+If last angle is sharper, the penalty factor f(x) will be reduced, thus imposing a lighter penalty on the repeated wide angle
 
-## 速度变化
+The `min()` chooses a smaller value for the penalty factor, to ensure that the penalty factor does not exceed the value of `wide_angle_bonus`.
 
-上一部分我们针对锐角和广角排列进行了奖励, 其前提是速度相近, 即速度变化在25%以内.
+## Velocity Change
 
-下面我们将引入速度变化奖励, 这次与上文有着相反的前提, 即速度一定要有不同, 我们将采用与上一节类似的策略来分析.
+In the previous section, the algorithm applied bonus to the acute and wide angle patterns, based on the assumption that the velocities are similar, i.e., the velocity changes are within 25%.
 
-这里我们按照注释, 将代码分为三部分: 比率计算、基数计算、节奏变化惩罚.
+In the following we will introduce the velocity change bonus, which has the opposite assumption from above, i.e., the velocity must be different, and we will analyze it using a similar procedure as in the previous section.
+
+Here we divide the code into three parts: Ratio Calculation, Base Calculation, and Rhythm Change Penalty.
 
 ```rust
 if prev_vel.max(curr_vel).not_eq(0.0) {
-    // * (比率计算)
+    // * (Ratio Calculation)
     // * We want to use the average velocity over the whole object when awarding
     // * differences, not the individual jump and slider path velocities.
     prev_vel = (osu_last_obj.lazy_jump_dist + osu_last_last_obj.travel_dist)
@@ -414,84 +424,82 @@ if prev_vel.max(curr_vel).not_eq(0.0) {
         (FRAC_PI_2 * (prev_vel - curr_vel).abs() / prev_vel.max(curr_vel)).sin();
     let dist_ratio = dist_ratio_base.powf(2.0);
 
-    // * Reward for % distance up to 125 / strainTime for overlaps where velocity is still changing. (基数计算)
+    // * Reward for % distance up to 125 / strainTime for overlaps where velocity is still changing. (Base Calculation)
     let overlap_vel_buff = (125.0 / osu_curr_obj.strain_time.min(osu_last_obj.strain_time))
         .min((prev_vel - curr_vel).abs());
 
     vel_change_bonus = overlap_vel_buff * dist_ratio;
 
-    // * Penalize for rhythm changes. (节奏变化惩罚)
+    // * Penalize for rhythm changes. (Rhythm Change Penalty)
     let bonus_base = (osu_curr_obj.strain_time).min(osu_last_obj.strain_time)
         / (osu_curr_obj.strain_time).max(osu_last_obj.strain_time);
     vel_change_bonus *= bonus_base.powf(2.0);
 }
 ```
 
-### 比率计算
+### Ratio Calculation
 
-在代码的后半部分, 我们可以看到`vel_change_bonus = overlap_vel_buff * dist_ratio`.
+Based on `vel_change_bonus = overlap_vel_buff * dist_ratio`, we find that the final velocity change bonus is calculated using the `base * ratio` formula, we will first look at how the ratio is calculated.
 
-即最终速度变化奖励是利用`基数 * 比率`的方式进行计算的, 这里我们先来看比率的计算方式.
+First, the `prev_vel` and `curr_vel` were recalculated, using the **green** line of the previous figure as the velocity values.
 
-首先, 针对`prev_vel`和`curr_vel`进行了重算, 使用了之前图1中**绿色**的部分作为速度值.
+Next, `dist_ratio` is calculated in a similar way to the angle bonus above, using sine and then square, and obviously, `dist_ratio` also takes values in the range of `[0, 1]`.
 
-接下来, `dist_ratio`与上文计算角度奖励的方式类似, 都采用先正弦再平方的方式, 很明显地, `dist_ratio`的取值范围为`[0, 1]`
+`(prev_vel - curr_vel).abs() / prev_vel.max(curr_vel)` calculates the ratio of the magnitude of the velocity change to the maximum velocity, reflecting the intensity of the velocity change.
 
-`(prev_vel - curr_vel).abs() / prev_vel.max(curr_vel)` 计算了速度变化的大小相对于最大速度的比例, 反应了速度变化的剧烈程度.
+The **intensity** of the velocity change as a **ratio** of the speed bonus, couldn't be more appropriate!
 
-速度变化的**剧烈程度**作为速度奖励的**比率**, 在合适不过了.
-
-> (a - b).abs() / a.max(b) 是一种特征缩放方式, 可以将任意量纲的数值范围缩放到 [0, 1] 区间里.
+> (a - b).abs() / a.max(b) is a feature scaling method that scales a range of values of arbitrary magnitude into the interval [0, 1].
 >
 > ![Snipaste_2024-07-03_10-46-29.png](https://s2.loli.net/2024/07/03/Ez5Aqb7N1nB4R8g.png){width="720px"}
 >
-> 这里x, y可分别看作当前物件与上一物件的速度, 而z值则为归一化后的速度变化.
+> Here x and y can be considered as the velocity of the current object and the previous object respectively, and the z value is the normalized velocity change.
 
-> 上文两次提到的先正弦再平方实际上也是一种特征映射的方式, 可以将原始值 x 映射到 [0, 1] 的范围内，并且平方操作可以增强映射后的值的变化幅度.
+> The sine-then-square approach mentioned twice above is actually a form of feature mapping, where the original value x is mapped to the range [0, 1], and the squaring operation enhances the magnitude of the mapping.
 >
-> 这里考虑到的变化幅度, 读者不妨考虑正弦函数各点的斜率(导数), 其变化幅度便一目了然了.
+> To consider the magnitude of the change, the reader may wish to consider the slope (derivative) of the sine function at each point, and the magnitude of the change will be readily apparent.
 
-### 基数计算
+### Base Calculation
 
-很明显, 这里直接使用了速度变化的大小作为基数的值.
+Obviously, velocity change is used directly as the base value.
 
-`(prev_vel - curr_vel).abs()` 计算了前后两个物件的速度大小的差值.
+`(prev_vel - curr_vel).abs()` calculates the difference between the velocities of the before and after objects.
 
-`(125.0 / osu_curr_obj.strain_time.min(osu_last_obj.strain_time))` 主要是限制了距离对速度的影响.
+`(125.0 / osu_curr_obj.strain_time.min(osu_last_obj.strain_time))` limits the influence of distance on velocity.
 
-限制可以确保在计算速度变化时, 只考虑在一定范围内的速度变化. 使奖励值更加关注较近的对象之间的速度变化, 而忽略较远对象之间的变化.
+The limit ensures that only velocity changes within a certain range are considered when calculating velocity changes. This makes the bonus value focus more on velocity changes between closer objects and ignore changes between more distant objects.
 
-### 节奏变化惩罚
+### Rhythm Change Penalty
 
-这里节奏变化惩罚也运用了类似的归一化手段. bonus_base(这里其实理解为penalize_base)的取值范围为[0, 1].
+The time-change penalty here uses a similar normalization technique. The value of bonus_base (which is actually interpreted as penalize_base) is in the range [0, 1].
 
-我们画出bonus_base的图象, 这里x, y轴为strain_time, z轴为bonus_base的值: 
+We plot the image of bonus_base, where the x and y axes are the strain_time, and the z axis is the value of bonus_base:
 
 ![Snipaste_2024-07-03_10-56-15.png](https://s2.loli.net/2024/07/03/BseojKufnCkFx7g.png){width="720px"}
 
-可以明显地看到, 当strain_time不变时, 几乎没有惩罚(bonus_base值为1).
+It is clear that when the strain_time is constant, there is almost no penalty (the value of bonus_base is 1).
 
-当strain_time出现变化时, 我们假定一个横纵坐标, 都有一个较小的bonus_base与其对应. **时间变化越大时, 惩罚越大**.
+When there is a change in strain_time, we assume a horizontal and vertical coordinate, there is always a smaller bonus_base corresponding to it. **The larger the change in time, the larger the penalty is**.
 
-> 注: 因为x, y轴strain_time可以等比缩放, 这里都设置为了1方便查看.
+> Note: Since the x and y axis of strain_time can be scaled equally, they are set to 1 for easy viewing.
 
-读者可能不容易理解, 为什么要针对时间变化进行惩罚呢, 这里我们举出游戏中的一个例子: 
+It may not be easy for the reader to understand why there is a penalty for time change, so here is an example in the gameplay:
 
 ![Snipaste_2024-07-03_11-16-25.png](https://s2.loli.net/2024/07/03/FSKkcRu4Qd71YvJ.png){width="720px"}
 
-我们将**圆圈3**作为当前物件, 这里**圆圈2**就是上一物件, 计算**圆圈3**的速度变化奖励将利用二者的速度.
+We'll consider **Circle 3** to be the current object, and **Circle 2** to be the previous object, algorithm will use the velocities of both to calculate the penalty of **Circle 3**.
 
-**圆圈3**的速度利用绿线计算, 属于间距小时间长, 速度必然很小.
+The speed of **Circle 3** is calculated using the green line, which is a small distance and a long time, so the speed must be very small.
 
-**圆圈2**的速度利用红线计算, 属于间距大时间短, 速度必然很大.
+The speed of **Circle 2** is calculated using the red line, which is a short time with a large distance, and the speed must be very large.
 
-在不引入时间变化惩罚的情况下, 算法将认为**圆圈3**的难度较高, 因为出现了较大的速度变化.
+Without introducing a time-change penalty, the algorithm will consider **Circle 3** to be more difficult because of the large velocity change that occurs.
 
-但实际上在玩家游玩中, 因为**圆圈3**与上一物件有较长的时间间隔, 所以已经感受不出速度变化了, 此时**圆圈3**的难度很低.
+But in fact, in the gameplay, because there is a long time interval between **Circle 3** and the previous object, the speed change is no longer felt, and the difficulty of **Circle 3** is pretty low at this time.
 
-从另一个角度来说, 如果我们将1, 2, 3, 4的时间轴拖拽均匀, 那么这是一段较难的排列, 玩家点击**圆圈3**时需要一定的aim control能力.
+On the other hand, if we drag the timeline of 1, 2, 3, 4 evenly, then this is a difficult pattern, and the player needs some aim control when hitting **Circle 3**.
 
-## 基值 *= 奖励
+## Base *= Bonus
 
 ```rust
 if osu_last_obj.base.is_slider() {
@@ -513,23 +521,24 @@ if with_sliders {
 aim_strain
 ```
 
-在上面的部分中, 我们已经将最终计算所需的各类奖励值和基础值计算好了, 总算要到最终计算`aim_strain`的时刻了.
+In the above section, we have calculated the various bonus and base values needed for the final calculation, and it is finally time to finalize the `aim_strain` calculation.
 
-首先映入我们眼帘的是一些定义好的常量 (以全大写和下划线命名), 这些常量规定了各增益在最终计算中的占比, 反应了参与计算的参数在最终数值中的权
+The first thing we see in the code are some defined constants (in all caps and underlined), which specify the proportion of each bonus in the final calculation.These constants reflect the weights of the parameters involved in the final calculation
 
-除常量外, 还有一些计算引起了我们的兴趣, 第一是滑条奖励的计算, 是比较简单粗暴的: `滑条距离 / 滑条时间`.
+Besides the constants, there are a couple of calculations, the first being the slider bonus calculation, which is rather simple: `Slider Distance / Slider Time`.
 
-这类滑条奖励主要将作用于拥有高速长滑条的一些谱面 (类似源流懐古那种), 偏Tech类的基本上增益不到.
+This type of slider bonus will mainly be applied to beatmaps with long, high speed sliders (like Genryuu Kaiko).
 
-另外, `aim_strain`取用锐角、广角、速度增益的方式也比较有意思, 这里是取**锐角** 或 **广角 + 速度**中的**较大者**.
+Also, the way `aim_strain` picks up acute, wide and speed bonus is quite interesting
+. it uses the **larger one** of **acute** or **wide + speed**.
 
-在上文我们提过, 锐角增益的应用条件是很苛刻的 (300BPM的跳, 150BPM的串), 这也导致了大部分的物件是不会吃到锐角奖励的.
+As we mentioned above, the conditions for applying acute bonus are very tough (300 BPM jumps, 150 BPM streams), which means that most of the objects will not get the acute bonus.
 
-在查看常量的取值后我们发现, 针对锐角增益的乘数是大于广角增益的乘数的, 这为一些高难度、苛刻的Pattern提供了更高的奖励.
+Looking at the values of the constants, we see that the multiplier for acute bonus is larger than the multiplier for wide bonus, which provides higher rewards for more difficult and demanding patterns.
 
-简单来说, 大部分的物件奖励值都来源于**广角 + 速度**的计算公式, 一些常见的谱面甚至没有机会吃到**锐角**奖励.
+Simply speaking, most of the object bonus comes from the **Wide Angle + Speed** formula, and those common beatmaps don't even have a chance to get any **Acute Angle** bonus.
 
-# 探索Speed Skill
+# Explore Speed
 
 同样的, 我们首先来关注speed.rs中, 针对Speed的ISkill实现`impl<'a> Skill<'a, Speed>`, 将重点放在`strain_value_at`方法
 
