@@ -555,10 +555,10 @@ fn strain_value_at(&mut self, curr: &'a OsuDifficultyObject<'a>) -> f64 {
 
 这次Rework备受关注和争议, 但一定程度上避免了Aim成为主要获取PP的方式, 将osu!从打地鼠模拟器的边缘拉了回来, 下文我们会着重介绍这部分.
 
-> 目前的节奏复杂度算法由Xexxar在2021年引入: [osu! Rhythm Complexity SR & PP Rework](https://github.com/ppy/osu/pull/14395)
-
-> abraker95在2019年提出过一套节奏复杂度的理论: [On the topic of rhythmic complexity](https://docs.google.com/document/d/1YjgfXKzz-8RpWkIT572qH_9fjCL6JltQEhf-BbQgJg4)
-
+> 关于节奏复杂度的发展历史:
+>
+> abraker95曾在2019年提出过一套节奏复杂度的理论: [On the topic of rhythmic complexity](https://docs.google.com/document/d/1YjgfXKzz-8RpWkIT572qH_9fjCL6JltQEhf-BbQgJg4)
+>
 > 2019年, 社区针对节奏复杂度的理解和讨论: [Rhythmic Complexity](https://github.com/ppy/osu-performance/issues/89)
 
 接下来, 我们还是按照代码的顺序来逐个介绍每一块内容.
@@ -603,13 +603,13 @@ if let Some(osu_next_obj) = osu_next_obj {
 
 `delta_diff`表明了本次间隔与下次间隔之间的差值. 这里我们以GIF中任意一个**圆圈2**举例, **圆圈2**的该值会非常大 (2与前一个1之间间隔非常短, 而与下一个1之间间隔非常长), 如果我们转而观察任意一个**圆圈1**, 可以得到相同的结论. 这里我们发现`delta_diff`就是衡量`doubletapness`的定量参数
 
-`speed_ratio`是衰减幅度的一部分. 意在将raw_doubletapness归一化到当前量纲
+`speed_ratio`是衰减幅度的一部分. 意在将`raw_doubletapness`归一化到当前量纲
 
 > 这里提到的300的hitwindow, 可以利用上文的公式: `2(80 - 6 * OD)` 计算得到, 这里的2意味着我们考虑整段hitwindow, 包含正负段
 >
 > doubletapness由apollo-dw在2022年引入: [Rework doubletap detection in osu!'s Speed evaluator](https://github.com/ppy/osu/pull/18692)
 >
-> 感兴趣的读者可以到apollo-dw提供的图形计算机自己调整参数尝试: [Desmos](https://www.desmos.com/calculator/vr8nzfqo4b?lang=zh-CN)
+> 感兴趣的读者可以到apollo-dw提供的图形计算器自己调整参数尝试: [Desmos](https://www.desmos.com/calculator/vr8nzfqo4b?lang=zh-CN)
 
 
 需要注意的是, 在2021年前后, **apollo-dw**推进了许多与Speed计算有关的提案, **doubletapness**修复只是**apollo-dw**伟大改革的一次未雨绸缪.
@@ -648,7 +648,7 @@ let dist = Self::SINGLE_SPACING_THRESHOLD.min(travel_dist + osu_curr_obj.min_jum
 
 > **apollo-dw**与**emu1337**通过上面提到的**doubletapness修复**和**限制strain_time**推进了[Remove speed caps in osu! difficulty calculation](https://github.com/ppy/osu/pull/14617)提案.
 >
-> 在2024年看来, 这些举动还是非常有前瞻性的, Wooting的出现大幅提升了头部玩家的高速串能力, 旧 ~333bpm 1/4 的限制移除是大势所趋
+> 在2024年看来, 这些提案还是非常有前瞻性的, Wooting的出现大幅提升了头部玩家的高速串能力, 旧 ~333bpm 1/4 的限制移除是大势所趋
 
 speed_bonus是从75ms开始的(200BPM), dist是从125osu!pixel开始的, 总体趋势为速度越大, 距离越远, strain值越大.
 
@@ -656,7 +656,7 @@ speed_bonus是从75ms开始的(200BPM), dist是从125osu!pixel开始的, 总体�
 
 ![Figure_1.png](https://s2.loli.net/2024/09/17/bAEjJxSapdctTfw.png)
 
-对于dist的计算, 这里与Aim中的velocity extends概念非常相似, 这里我们重新引入作为例子的图片:
+对于dist的计算, 这里与Aim中的velocity extends概念非常相似, 这里我们重新引入那张图片:
 
 ![](https://s2.loli.net/2024/07/02/WBSebI6OzCKnd3a.png){width="720px"}
 
@@ -757,9 +757,7 @@ for (int i = rhythmStart; i > 0; i--)
 
 很明显地, 结算时我们有意地储存了一些previousIsland的状态, 不难理解, 这是在为下一小组结算时**创建上下文**
 
-> 另外地, 这里`if (prevDelta * 1.25 < currDelta) firstDeltaSwitch = false;`也可能引起我们的注意, 结合注释, 可以理解这样做的目的.
->
-> 当速度维持上涨趋势时, 小组可以接连被创建. 当速度不再上涨时, 定性判据将被复原, 直至下一次满足`prevDelta > 1.25 * currDelta`
+> 另外地, 这里`if (prevDelta * 1.25 < currDelta) firstDeltaSwitch = false;` 当速度维持上涨趋势时, 小组可以接连被创建. 当速度不再上涨时, 定性判据将被复原, 直至下一次满足`prevDelta > 1.25 * currDelta`
 >
 > 敏锐的读者可能察觉到我们上文示意图中的错误, 实际上, 单调节奏不是被分为了一个大组, 而是很多人数为1的小组.
 
@@ -785,7 +783,7 @@ double effectiveRatio = windowPenalty * currRatio;
 
 重新审视整个过程, 我们会针对**每一个物件**应用RhythmEvaluator, 在单一物件中提出Sum这种概念是很危险的, 我们需要将Sum平摊到每一个物件的strain上.
 
-最简单的方式是直接将`rhythmComplexitySum` / `rhythmStart`个数, 但这样显然并不明智. 所以在这里引入了`currHistoricalDecay`.
+最简单的方式是直接将`rhythmComplexitySum` 除以 `rhythmStart`, 但这样显然并不明智. 所以在这里引入了`currHistoricalDecay`.
 
 `currHistoricalDecay`根据相差时间进行均匀的伸缩, 把Sum值平摊到0~N个历史物件中.
 

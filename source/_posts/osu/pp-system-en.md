@@ -1,10 +1,9 @@
 ---
-title: PP究竟是如何算出来的? 剖析osu!的PP算法!
-date: 2024-07-01 9:29:59
+title: How does PP actually work out? Dissecting the PP algorithm of osu!
+date: 2024-09-20 15:00:59
 categories: [osu]
 tags:
     - osu!
-    - PP算法
 ---
 
 In this paper, we mainly investigate the PP algorithm in osu! standard ruleset, aiming to help other players who are interested in the PP algorithm to quickly build up their knowledge of the algorithm. 
@@ -540,7 +539,7 @@ Simply speaking, most of the object bonus comes from the **Wide Angle + Speed** 
 
 # Explore Speed
 
-同样的, 我们首先来关注speed.rs中, 针对Speed的ISkill实现`impl<'a> Skill<'a, Speed>`, 将重点放在`strain_value_at`方法
+Similar to Aim, let's first focus on the ISkill implementation of Speed in speed.rs, focusing on the `strain_value_at` method.
 
 ```rust
 fn strain_value_at(&mut self, curr: &'a OsuDifficultyObject<'a>) -> f64 {
@@ -558,43 +557,43 @@ fn strain_value_at(&mut self, curr: &'a OsuDifficultyObject<'a>) -> f64 {
 }
 ```
 
-经过粗略的阅读, 我们发现了此处与上文Aim计算略微不同的地方. 这里将`curr_strain(speed_strain)`作为基值, 而`curr_rhythm`作为因数, 速度与节奏复杂度相乘作为最终的值, 所以我们下文主要分为SpeedEvaluator和RhythmEvaluator两个板块
+After a skimming, we discovered a slight difference with the Aim calculation above. Here `curr_strain(speed_strain)` is used as the base value, and `curr_rhythm` is used as the factor. Obviously, the speed is multiplied by the rhythmic complexity as the final value, therefore we divide the calculation into two main sections: SpeedEvaluator and RhythmEvaluator.
 
-此处的**节奏复杂度**(RhythmEvaluator)就是在[2021年11月 Rework](https://osu.ppy.sh/home/news/2021-11-09-performance-points-star-rating-updates)由Xexxar引入的概念.
+The **Rhythm Complexity** (RhythmEvaluator) here is the concept introduced in [November 2021 Rework](https://osu.ppy.sh/home/news/2021-11-09-performance-points-star-rating-updates) by Xexxar.
 
-这次Rework备受关注和争议, 但一定程度上避免了Aim成为主要获取PP的方式, 将osu!从打地鼠模拟器的边缘拉了回来, 下文我们会着重介绍这部分.
+The Rework was controversial and highly publicized, yet it somewhat prevented Aim from becoming the main way to get PP, and brought osu! back from being a gopher simulator. We'll focus on that part later.
 
-> 目前的节奏复杂度算法由Xexxar在2021年引入: [osu! Rhythm Complexity SR & PP Rework](https://github.com/ppy/osu/pull/14395)
+> History on the development of rhythmic complexity:
+>
+> abraker95 had proposed a theory of rhythmic complexity in 2019: [On the topic of rhythmic complexity](https://docs.google.com/document/d/1YjgfXKzz-8RpWkIT572qH_9fjCL6JltQEhf-BbQgJg4)
+>
+> 2019, Community Understanding and Discussion for Rhythmic Complexity: [Rhythmic Complexity](https://github.com/ppy/osu-performance/issues/89)
 
-> abraker95在2019年提出过一套节奏复杂度的理论: [On the topic of rhythmic complexity](https://docs.google.com/document/d/1YjgfXKzz-8RpWkIT572qH_9fjCL6JltQEhf-BbQgJg4)
-
-> 2019年, 社区针对节奏复杂度的理解和讨论: [Rhythmic Complexity](https://github.com/ppy/osu-performance/issues/89)
-
-接下来, 我们还是按照代码的顺序来逐个介绍每一块内容.
+Next, we'll go through each piece of the code one by one, in the same order as the code.
 
 ## SpeedEvaluator
 
-在开始介绍SpeedEvaluator之前, 我们先对一些概念进行补充:
+Before we start introducing SpeedEvaluator, let's expand on some concepts: 
 
-`hit_window`: HitWindow是完成物件打击的时间窗口期, 与谱面的OD息息相关 (注意, rosu-pp中所有提到的`hit_window`均为整段hit_window, 即下面的计算公式 * 2).
+`hit_window`: The window of time during which the hit should be completed, and is closely related to the OD of the beatmap (note that all references to the `hit_window` in rosu-pp are to the entire hit_window, which is calculated as two times larger).
 
-在游戏内将光标悬停在左上角的谱面三维位置可以看到窗口期(单位为ms), osu!standard模式有这样的计算方式:
+The hit window (in ms) can be seen in-game by hovering the cursor over the 3D position of the beatmap in the upper-left corner. osu!standard mode calculates it like this.
 
 ![Snipaste_2024-07-08_13-29-04.png](https://s2.loli.net/2024/07/08/FR6DjZHcleKgyY3.png)
 
-> 这里推荐阅读osu!Wiki: [判定严度 (Overall difficulty)](https://osu.ppy.sh/wiki/zh/Beatmap/Overall_difficulty)
+> Recommended reading of osu!Wiki: [Overall difficulty](https://osu.ppy.sh/wiki/en/Beatmap/Overall_difficulty)
 
-### 单拍？双按！
+### Single tap? Doubled!
 
-算法总是需要跟随谱师的脑洞不断更新迭代, 有创新性的谱面经常能推动PP系统的更新, **doubletapness**就是这样被引入的
+Algorithms always need to be iteratively updated to follow the mapper's talent, and innovative beatmaps can often push PP systems to update, this is how **doubletapness** was introduced
 
-引入**doubletapness**源于哪张谱面呢, 请看VCR (雾):
+The introduction of **doubletapness** comes from the beatmap below:
 
 ![low_qualgif.gif](https://s2.loli.net/2024/09/16/ioh4fcxyztBLXqp.gif)
 
-仔细看的读者应该能发现，片段中多次出现需要双按的单拍, 这在Speed计算看来, 被判定为极高速的切, DTHR后更会使这种情况加剧.
+It should be noticeable that there are several single beats in the segment that require double-tapping, which, in Speed calculations, is judged to be an extremely high-speed cut, and what's more, this will be exacerbated by the DTHR.
 
-> 在**doubletapness**引入之前, 这张图DTHR后被给予了13星的超高难度 (目前为8.66星)
+> Before the introduction of **doubletapness**, this map was given a super-high 13 stars after DTHR (currently 8.66)
 
 ```rust
 // * Nerf doubletappable doubles.
@@ -608,24 +607,24 @@ if let Some(osu_next_obj) = osu_next_obj {
 }
 ```
 
-`window_ratio`将**相邻两个物件**与300的`hit_window`相比较. 假定N是当前物件, 如果`delta(N, N-1)`比300的hitwindow小, 那么在(N-2, N-1)与(N-1, N)之间可以认为存在doubletapness的情况, 这里`window_ratio`是`doubletapness`的定性参数
+`window_ratio` compares **two neighboring objects** to a `hit_window` of 300. Assuming N is the current object, if `delta(N, N-1)` is smaller than the hitwindow of 300, then it can be assumed that there is doubletapness between (N-2, N-1) and (N-1, N), where `window_ratio` is a qualitative indicator of `doubletapness`.
 
-`delta_diff`表明了本次间隔与下次间隔之间的差值. 这里我们以GIF中任意一个**圆圈2**举例, **圆圈2**的该值会非常大 (2与前一个1之间间隔非常短, 而与下一个1之间间隔非常长), 如果我们转而观察任意一个**圆圈1**, 可以得到相同的结论. 这里我们发现`delta_diff`就是衡量`doubletapness`的定量参数
+The `delta_diff` indicates the difference between the current interval and the next interval. Here we take any **Circle 2** in the GIF as an example, the value of **Circle 2** will be very large (2 is very short from the previous 1, and very long from the next 1), and if we look at any **Circle 1**, we can get the same conclusion. Here we find that `delta_diff` is a quantitative indicator of `doubletapness`.
 
-`speed_ratio`是衰减幅度的一部分. 意在将raw_doubletapness归一化到当前量纲
+The `speed_ratio` is part of the decay amplitude. The purpose is to normalize `raw_doubletapness` to the current dimension.
 
-> 这里提到的300的hitwindow, 可以利用上文的公式: `2(80 - 6 * OD)` 计算得到, 这里的2意味着我们考虑整段hitwindow, 包含正负段
+> The hitwindow of 300 mentioned here can be calculated using the formula above: `2(80 - 6 * OD)`, where 2 means that we consider the whole hitwindow, including positive and negative ones.
 >
-> doubletapness由apollo-dw在2022年引入: [Rework doubletap detection in osu!'s Speed evaluator](https://github.com/ppy/osu/pull/18692)
+> doubletapness was introduced by apollo-dw in 2022: [Rework doubletap detection in osu!'s Speed evaluator](https://github.com/ppy/osu/pull/18692)
 >
-> 感兴趣的读者可以到apollo-dw提供的图形计算机自己调整参数尝试: [Desmos](https://www.desmos.com/calculator/vr8nzfqo4b?lang=zh-CN)
+> You can go to the graphing calculator provided by apollo-dw and try to adjust the parameters yourself.: [Desmos](https://www.desmos.com/calculator/vr8nzfqo4b?lang=zh-CN)
 
 
-需要注意的是, 在2021年前后, **apollo-dw**推进了许多与Speed计算有关的提案, **doubletapness**修复只是**apollo-dw**伟大改革的一次未雨绸缪.
+Note that around 2021, **apollo-dw** promoted many proposals related to Speed calculations, and **doubletapness**  is just a rainy day for **apollo-dw**'s great reforms.
 
-**apollo-dw**的名字还会在下面的内容中出现.
+**apollo-dw**'s name will also appear below.
 
-### 速度为底、距离为因
+### Velocity & Distance
 
 ```rust
 // * Cap deltatime to the OD 300 hitwindow.
@@ -649,57 +648,57 @@ let dist = Self::SINGLE_SPACING_THRESHOLD.min(travel_dist + osu_curr_obj.min_jum
     / strain_time
 ```
 
-在计算的开头, 我们注意到了这个对于`strain_time`的限制操作, 他实际来源于**apollo-dw**的一个commit: [Remove speed caps in osu! difficulty calculation](https://github.com/ppy/osu/pull/14617)
+At the beginning of the calculation, we note this limitation on `strain_time`, which is actually derived from a commit in **apollo-dw**: [Remove speed caps in osu! difficulty calculation](https://github.com/ppy/osu/pull/14617)
 
-限制`strain_time`的本意是防止**高BPM低OD串**的谱面算出过高的星数, 同时推进移除旧算法直接限制Speed值的行为.
+The intent of limiting `strain_time` is to prevent **high BPM low OD streams** from getting too high difficulties, as well as to remove the old algorithm's behavior of simply capping the Speed value.
 
-这里考虑了物件之间的间隔时间是否小于300的hitwindow, 如果小于, 就会对strain_time进行削弱.
+It takes into account whether the time between objects is less than 300 hit window, and if it is less, it will nerf the strain_time.
 
-> **apollo-dw**与**emu1337**通过上面提到的**doubletapness修复**和**限制strain_time**推进了[Remove speed caps in osu! difficulty calculation](https://github.com/ppy/osu/pull/14617)提案.
+> **apollo-dw** and **emu1337** advanced[Remove speed caps in osu! difficulty calculation](https://github.com/ppy/osu/pull/14617).
 >
-> 在2024年看来, 这些举动还是非常有前瞻性的, Wooting的出现大幅提升了头部玩家的高速串能力, 旧 ~333bpm 1/4 的限制移除是大势所趋
+> In the year 2024, these proposals appear to be very forward-thinking, with the advent of wooting dramatically increasing the ability of top players to stream at high speeds, and the removal of the old ~333bpm 1/4 will somehow always be approved.
 
-speed_bonus是从75ms开始的(200BPM), dist是从125osu!pixel开始的, 总体趋势为速度越大, 距离越远, strain值越大.
+The speed_bonus starts at 75ms (200BPM), the dist starts at 125 osu!pixel, and the overall trend is that the higher the speed, the farther the distance, the larger the strain value will be.
 
-这里我们利用matplotlib绘制了`speed_bonus`关于`strain_time`的曲线提供给读者参考:
+Here we have graphed `speed_bonus` about `strain_time` using matplotlib:
 
 ![Figure_1.png](https://s2.loli.net/2024/09/17/bAEjJxSapdctTfw.png)
 
-对于dist的计算, 这里与Aim中的velocity extends概念非常相似, 这里我们重新引入作为例子的图片:
+The calculation of dist is very similar to the concept of velocity extends in Aim, so let's reintroduce the image here:
 
 ![](https://s2.loli.net/2024/07/02/WBSebI6OzCKnd3a.png){width="720px"}
 
-请读者将**圆圈2**当做当前物件, 这里**圆圈2**的dist就是红色距离与橙色距离的和
+Please consider **Circle 2** as the current object, the dist of **Circle 2** is the sum of the red and orange distances.
 
 ## RhythmEvaluator
 
-由于RhythmEvaluator较为复杂, 这里我们先对原理进行总体而粗略的解释, 再结合代码分析.
+Since RhythmEvaluator is quite complex, we will first explain the theory in general and then analyze it with the code.
 
-首先, RhythmEvaluator本身与上文的AimEvaluator, SpeedEvaluator无异, 都是针对**具有上下文的单个物件**算出的值.
+First of all, the RhythmEvaluator itself is the same as the AimEvaluator and SpeedEvaluator above, it is a strain-like value evaluated for a single hit object.
 
-节奏复杂度围绕`effectiveRatio`这个参数展开. 首先, effectiveRatio会根据初始节奏变化得到一个基值, 再通过类似**组间评分**的方式进行削弱.
+The rhythmic complexity is based on the parameter `effectiveRatio`. First, effectiveRatio gets a base value from the initial rhythm change, and then it is reduced in a way similar to **intergroup evaluation**.
 
-### 组间评分
+### Intergroup Evaluation
 
-这里, 我们利用比较通俗的语言模拟一下组间评分的过程:
+Now, we use pseudo-code to simulate the process of intergroup evaluation:
 
-首先, 先寻找当前物件**5s内**的**0~32个历史物件**, 最终会脱颖而出`rhythmStart`个历史物件
+Firstly, find **0~32 history objects** of the current object **within 5s**, and then find the number of matched objects called `rhythmStart`.
 
-接下来, 我们会按顺序遍历这些个历史物件, 尝试在遍历中对前后相邻的物件进行分组(`island`), 分组依据是节奏发生了较大幅度变化(`deltaTime`变化超出25%)
+Next, we traverse the history objects sequentially, trying to group the neighbor objects as `island` on basis of large change in rhythm (`deltaTime` changes by more than 25%).
 
-遍历过后, 所有的历史物件都应该被分好了自己的小组(`island`), 小组人数为1~8人. 小组可以容纳超过8个物件, 但小组人数只会被记作8
+After traversing, all historical objects should be organized into groups (`island`) of 1 to 8 people. Groups can contain more than 8 objects, but the number of people in the group will only be counted as 8.
 
-最后, 我们要在小组(`island`)间进行评分, 当某些Pattern出现时, `effectiveRatio`值会被削弱, 例如: 人数相等的小组重复出现(xxx-xxx), 前后小组人数奇偶相同(xx-xxxx)等等
+At last, we have to score between groups (`island`), the `effectiveRatio` value will be reduced when certain patterns appear, for example: groups with equal length are repeating (xxx-xxx), neighbor groups have the same odevity (xx-xxxx), and so on.
 
-示意图 (图片部分来自**emu1337**的截图): 
+Diagram (Image partly from **emu1337**'s screenshot): 
 
 ![Snipaste_2024-09-17_01-23-45.png](https://s2.loli.net/2024/09/17/gEfGa1UADmCHtxL.png)
 
-### 实现细节
+### Realization details
 
-接下来我们将结合代码对提到的组间评分过程进行分析, 需要注意的是, 这里为了提高可读性, 选择了C#版本的代码.
+Next, we will analyze the mentioned intergroup evaluation process along with the code. Note that the C# version of the code has been used here in order to improve readability.
 
-#### 筛选对象
+#### Filtering Objects
 
 ```csharp
 int historicalNoteCount = Math.Min(current.Index, 32);
@@ -708,14 +707,14 @@ while (rhythmStart < historicalNoteCount - 2 && current.StartTime - current.Prev
     rhythmStart++;
 ```
 
-相信这里看到`rhythmStart`, 读者应该并不陌生, 我们在此处完成了寻找当前物件**5s内**的**0~32个历史物件**的操作.
+Here `rhythmStart`, which is not new to us, performs the task of finding the current object **within 5s** of **0~32 historical objects**.
 
-#### 进行分组
+#### Grouping
 
 ```csharp
 for (int i = rhythmStart; i > 0; i--)
 {
-    // 省略了effectiveRatio初值的计算
+    // (The calculation of the initial value of effectiveRatio is omitted.)
 
     if (firstDeltaSwitch)
     {
@@ -726,10 +725,9 @@ for (int i = rhythmStart; i > 0; i--)
         }
         else
         {
-            // 省略了对于effectiveRatio的削弱计算
+            // (The calculation of the reduction of the effectiveRatio has been omitted.)
 
             /*
-                将分组运算的结果累计到rhythmComplexitySum中, 后文我们会再提到
                 rhythmComplexitySum += Math.Sqrt(effectiveRatio * previousRatio) * currHistoricalDecay * Math.Sqrt(4 + islandSize) / 2 * Math.Sqrt(4 + previousIslandSize) / 2;
                 previousRatio = effectiveRatio;
             */
@@ -752,27 +750,25 @@ for (int i = rhythmStart; i > 0; i--)
 }
 ```
 
-此处的代码段省略了部分值的计算过程, 让我们聚焦于island的分组依据和分组过程.
+The code snippet here omits some of the calculation of the values, so that we can focus on the basis of island's grouping.
 
-首先, for循环让我们对所有的历史物件遍历, 显而易见的, `firstDeltaSwitch`是新小组产生的定性判据.
+First, the loop lets us iterate over all the history objects, and obviously, `firstDeltaSwitch` is the qualitative indicator for the creation of a new island.
 
-一旦满足`prevDelta > 1.25 * currDelta`, 即deltaTime发生了加速25%的变化时, 算法认为应该生成一个新的小组了.
+Once `prevDelta > 1.25 * currDelta` is met, i.e. the deltaTime has changed by 25%, the algorithm thinks it is time to create a new island.
 
-在下一次循环中, 由于`firstDeltaSwitch`被置为`true`, 算法将走入第一个if分支中.
+In the next loop, since `firstDeltaSwitch` is set to `true`, the algorithm will go to the first "if" branch.
 
-显然, 第二个if分支决定了分组结果, 一旦`prevDelta > 1.25 * currDelta || prevDelta * 1.25 < currDelta`条件满足, 即速度发生了较大变化时, 当前小组将结束并进行结算(else分支).
+Obviously, the second if branch determines the grouping result, and once the condition `prevDelta > 1.25 * currDelta || prevDelta * 1.25 < currDelta` is met, i.e., a large change in velocity has occurred, the current group will be terminated and settled ("else" branch).
 
-结算的过程就是我们在上文提到的小组(`island`)间进行评分的过程. 与伪代码描述不同的是, 在真实代码中, 分组与结算是接连完成的, 而不是先分组再结算的.
+The settlement process is the intergroup evaluation we mentioned above. Unlike the pseudo-code description, in the real code, the grouping is done back-to-back with the settlement, rather than grouping and then settling.
 
-很明显地, 结算时我们有意地储存了一些previousIsland的状态, 不难理解, 这是在为下一小组结算时**创建上下文**
+Obviously, we're intentionally storing some previousIsland state at settlement time, which, unsurprisingly, creates context for the next group settles.
 
-> 另外地, 这里`if (prevDelta * 1.25 < currDelta) firstDeltaSwitch = false;`也可能引起我们的注意, 结合注释, 可以理解这样做的目的.
+> In addition, `if (prevDelta * 1.25 < currDelta) firstDeltaSwitch = false;` islands can be created one after another while the velocity maintains an upward tendency. When the velocity is no longer increasing, the qualitative criterion is restored until the next time `prevDelta > 1.25 * currDelta` is met.
 >
-> 当速度维持上涨趋势时, 小组可以接连被创建. 当速度不再上涨时, 定性判据将被复原, 直至下一次满足`prevDelta > 1.25 * currDelta`
->
-> 敏锐的读者可能察觉到我们上文示意图中的错误, 实际上, 单调节奏不是被分为了一个大组, 而是很多人数为1的小组.
+> You may notice an error in our diagram above, in fact, the monotonous rhythms are not divided into one large group, but into many groups with one member.
 
-#### 初值计算
+#### Base Calculation
 
 ```csharp
 double currHistoricalDecay = (history_time_max - (current.StartTime - currObj.StartTime)) / history_time_max; // scales note 0 to 1 from history to now
@@ -790,31 +786,29 @@ double effectiveRatio = windowPenalty * currRatio;
 
 ##### currHistoricalDecay
 
-在**进行分组**部分的代码展示中, 我们一笔带过了`rhythmComplexitySum`的计算, 其中引用了`currHistoricalDecay`这个概念.
+In the **Grouping** section of the code presentation, we skipped over the calculation of the `rhythmComplexitySum`, which referenced the concept of `currHistoricalDecay`.
 
-重新审视整个过程, 我们会针对**每一个物件**应用RhythmEvaluator, 在单一物件中提出Sum这种概念是很危险的, 我们需要将Sum平摊到每一个物件的strain上.
+Revisiting the whole process, we will apply the RhythmEvaluator to **each object**. It is dangerous to put the effect of sum value in a single object, and we need to spread the sum influence over the strains in each objects.
 
-最简单的方式是直接将`rhythmComplexitySum` / `rhythmStart`个数, 但这样显然并不明智. 所以在这里引入了`currHistoricalDecay`.
+The simplest way would be to divide `rhythmComplexitySum` by `rhythmStart`, but this is obviously not wise. So here we introduce `currHistoricalDecay`.
 
-`currHistoricalDecay`根据相差时间进行均匀的伸缩, 把Sum值平摊到0~N个历史物件中.
+The `currHistoricalDecay` scales uniformly according to the difference in time, spreading the sum over 0 to N historical objects.
 
 ##### effectiveRatio
 
-`currRatio`的表达式我们并不陌生, 
+The expression of `currRatio` is not new to us. 
 
-`currRatio`的函数表达形式(先正弦再平方)我们并不陌生, 与Aim中曾提到的速度变化奖励不能说毫不相干，只能说一模一样.
+The `currRatio` function (sine then square) is not new to us, and is exactly the same as the velocity change bonus mentioned in Aim.
 
-这里我们甚至可以引用上文的原文:
-
-> `(prev_vel - curr_vel).abs() / prev_vel.max(curr_vel)` 计算了速度变化的大小相对于最大速度的比例, 反应了速度变化的剧烈程度.
+> `(prev_vel - curr_vel).abs() / prev_vel.max(curr_vel)` calculates the ratio of the magnitude of the velocity change to the maximum velocity, reflecting the intensity of the velocity change.
 >
-> 相同地, 这里也采用了先正弦再平方的方式进行因数的归一化, 有疑问的读者可以返回上文查看.
+> Similarly, the normalization of the factors is done in a sine-then-square approach, and the reader can check back above if needed.
 >
-> **Xexxar**也放出了该公式的图形计算器: [Desmos](https://www.desmos.com/calculator/j6yykmbb6f)
+> **Xexxar** has also put up a graphing calculator for the formula: [Desmos](https://www.desmos.com/calculator/j6yykmbb6f)
 
-`windowPenalty`主要针对重叠的窗口进行惩罚, 这里的玩法类似于之前**apollo-dw**的`doubletapness`.
+`windowPenalty` penalizes overlapping windows, similar to **apollo-dw**'s `doubletapness`.
 
-#### 组间计算
+#### Intergroup Calculations
 
 ```csharp
 if (currObj.BaseObject is Slider) // bpm change is into slider, this is easy acc window
@@ -833,10 +827,12 @@ if (lastDelta > prevDelta + 10 && prevDelta > currDelta + 10) // previous increa
     effectiveRatio *= 0.125;
 ```
 
-通过简单的阅读, 我们很容易发现组间削弱的逻辑, 同时我们也逐渐意识到节奏分组的优势与可行性所在.
+Through the codes, it was easy to see the logic of the reduction among the groups. We came to realize the advantages and feasibility of rhythmic grouping.
 
 ---
 
-至此, 我们已经通过AimEvaluator和SpeedEvaluator探索了osu!算法的设计逻辑和具体实现. 在探究的过程中, 笔者希望读者在满足了好奇心的同时, 对于音乐类游戏的算法体系有一些简单的理解和感悟. 在行文过程中, 我们也涉及到了诸如函数拟合、归一化等统计学知识, 希望对于启发读者进行数学相关研究有帮助.
+So far, we have explored the design logic and implementation of osu! algorithm through AimEvaluator and SpeedEvaluator. In the process of exploration, I hope that readers can satisfy their curiosity and at the same time gain some simple understanding of the algorithmic system of rhythm games. In this paper, we also involve such statistical knowledge as function fitting, normalization, etc., and I hope that it will help to inspire readers to carry out mathematics-related research.
 
-2024-07-01 至 2024-09-19, 兔肉献上.
+2024-07-01 to 2024-09-19, Written by TuRou.
+
+2024-09-20 to 2024-09-23, English by TuRou.
