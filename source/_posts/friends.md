@@ -13,4 +13,11 @@ date: 2022-01-01 00:00:00
   image: https://www.kaitaku.xyz/assets/avatar.webp
   color: "#00BFFF"
 
+- site: Hello I'm 0o酱
+  owner: 0o酱
+  url: https://blog.im0o.top/
+  desc: 光阴如梦，昨日随风
+  image: https://image.im0o.top/files/202112021204213.jpg
+  color: "#F47F2C"
+
 {% endlinks %}
