@@ -4,6 +4,7 @@ date: 2024-09-20 15:00:59
 categories: [osu]
 tags:
     - osu!
+hidden: true
 ---
 
 In this paper, we mainly investigate the PP algorithm in osu! standard ruleset, aiming to help other players who are interested in the PP algorithm to quickly build up their knowledge of the algorithm. 
