@@ -1,7 +1,7 @@
 ---
 title: 浅谈人物形象的变化在视觉小说中的表现形式
 date: 2021-08-20 11:19:59
-categories: [papers]
+categories: [rambling]
 tags:
     - Galgame
     - 杂谈

@@ -49,7 +49,7 @@ dependencies {
 ```
 
 ```toml
-位于: resources\META-INF\mods.toml
+# 位于: resources\META-INF\mods.toml
 [[dependencies.powerful_tank]]
     modId="zerocore"
     mandatory=true
@@ -98,7 +98,7 @@ public class MultiblockTank extends AbstractCuboidMultiblockController<Multibloc
 使用IDE自动填充所有抽象方法后，我们可以先关注这样几个方法
 
 ```java
-位于: powerful_tank/multiblock/MultiblockTank.java
+// 位于: powerful_tank/multiblock/MultiblockTank.java
 @Override
     // 这里定义了多方块结构中Part的最少数量，我们把储罐外壳也作为Part，所以3*3中空结构正好需要26个Part
     protected int getMinimumNumberOfPartsForAssembledMachine() {
@@ -152,7 +152,7 @@ public class MultiblockTank extends AbstractCuboidMultiblockController<Multibloc
 在block包中创建类GlassWallBlock
 
 ```java
-位于: powerful_tank/block/GlassWallBlock.java
+// 位于: powerful_tank/block/GlassWallBlock.java
 // 为了实现透明效果，我们继承自AbstractGlassBlock
 public class GlassWallBlock extends AbstractGlassBlock {
     public GlassWallBlock() {
@@ -177,7 +177,7 @@ public class GlassWallBlock extends AbstractGlassBlock {
 之后我们来创建对应的GlassWallTileEntity，在包tileEntity中创建类GlassWallTileEntity，他需要继承自AbstractCuboidMultiblockPart，同时泛型类型为我们先前创建的MultiblockTank
 
 ```java
-位于: powerful_tank/tileentity/GlassWallTileEntity.java
+// 位于: powerful_tank/tileentity/GlassWallTileEntity.java
 public class GlassWallTileEntity extends AbstractCuboidMultiblockPart<MultiblockTank> {
     public GlassWallTileEntity() {
         // 待会我们要注册的TILE_ENTITY_TYPE
@@ -211,7 +211,7 @@ public class GlassWallTileEntity extends AbstractCuboidMultiblockPart<Multiblock
 我们在主类中添加对应的注册，注意这里我们需要对三个方块的RenderType进行特殊的注册，因为我们希望这三者的渲染方式为CutoutMipped，感兴趣的读者可以阅读[Boson的相关内容](https://boson.v2mcdev.com/block/rendertype.html)
 
 ```java
-位于: powerful_tank/PowerfulTank.java
+// 位于: powerful_tank/PowerfulTank.java
 @Mod("powerful_tank")
 public class PowerfulTank {
     // 这里我们让注册类作为主类的内部类
@@ -261,7 +261,7 @@ public class PowerfulTank {
 首先，在GlassEnergyPortTileEntity中加入以下内容，为他添加能量储存
 
 ```java
-位于: powerful_tank/tileentity/GlassEnergyPortTileEntity.java
+// 位于: powerful_tank/tileentity/GlassEnergyPortTileEntity.java
 // 因为我们对能量的需求比较简单，我们这里没有自己手动实现IEnergyHandler，而是直接利用了Forge实现好的EnergyStorage类
 public final EnergyStorage energyStorage = new EnergyStorage(2_500_000, 2_500_000);
 
@@ -309,7 +309,7 @@ public String getEnergyText() {
 同样的，这里我们为GlassFluidPortTileEntity添加流体支持
 
 ```java
-位于: powerful_tank/tileentity/GlassFluidPortTileEntity.java
+// 位于: powerful_tank/tileentity/GlassFluidPortTileEntity.java
 // 这里我们也没有手动实现IFluidHandler，而是使用了Forge实现好的FluidTank，并且做了小更改
 public final FluidTank fluidTank = new FluidTank(Integer.MAX_VALUE) {
     @Override
@@ -370,7 +370,7 @@ public String getFluidText() {
 最后我们来补全MultiblockTank的逻辑。在MultiblockTank中添加下面的内容
 
 ```java
-位于: powerful_tank/multiblock/MultiblockTank.java
+// 位于: powerful_tank/multiblock/MultiblockTank.java
 private EnergyStorage energyStorage;
 private FluidTank fluidTank;
 
@@ -428,7 +428,7 @@ protected boolean isMachineWhole(@Nonnull IMultiblockValidator validatorCallback
 对于多方块结构，updateServer方法会在逻辑服务端每一个游戏刻被执行一次，所以请用对待tick方法的态度对待他，尽量减小对服务器性能的影响。
 
 ```java
-位于: powerful_tank/multiblock/MultiblockTank.java
+// 位于: powerful_tank/multiblock/MultiblockTank.java
 @Override
 protected boolean updateServer() {
     if (energyStorage != null && fluidTank != null) {
@@ -456,7 +456,7 @@ public int getCost() {
 现在进入游戏，我们的多方块结构已经能够正常运作了，相信阅读到了这里，读者已经对如何开发一个简单的多方块机器有了自己的理解。我们这里还会补全一些外围方法，来让机器更人性化。首先，我们希望多方块结构在没有构成时告知我们错误的原因。我们编辑GlassWallBlock类并且重写use方法
 
 ```java
-位于: powerful_tank/block/GlassWallBlock.java
+// 位于: powerful_tank/block/GlassWallBlock.java
 @Nonnull
 @Override
 public ActionResultType use(@Nonnull BlockState pState, World pLevel, @Nonnull BlockPos pPos, @Nonnull PlayerEntity pPlayer, @Nonnull Hand pHand, @Nonnull BlockRayTraceResult pHit) {
@@ -477,7 +477,7 @@ public ActionResultType use(@Nonnull BlockState pState, World pLevel, @Nonnull B
 玩家可能还想要知道此时储存的能量和流体数量，我们也添加相关方法，编辑GlassEnergyPortBlock和GlassFluidPortBlock类
 
 ```java
-位于: powerful_tank/block/GlassEnergyPortBlock.java
+// 位于: powerful_tank/block/GlassEnergyPortBlock.java
 @Nonnull
 @Override
 public ActionResultType use(@Nonnull BlockState pState, World pLevel, @Nonnull BlockPos pPos, @Nonnull PlayerEntity pPlayer, @Nonnull Hand pHand, @Nonnull BlockRayTraceResult pHit) {
@@ -495,7 +495,7 @@ public ActionResultType use(@Nonnull BlockState pState, World pLevel, @Nonnull B
 ```
 
 ```java
-位于: powerful_tank/block/GlassFluidPortBlock.java
+// 位于: powerful_tank/block/GlassFluidPortBlock.java
 @Nonnull
 @Override
 public ActionResultType use(@Nonnull BlockState pState, World pLevel, @Nonnull BlockPos pPos, @Nonnull PlayerEntity pPlayer, @Nonnull Hand pHand, @Nonnull BlockRayTraceResult pHit) {

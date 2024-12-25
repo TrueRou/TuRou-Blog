@@ -32,15 +32,17 @@ tags:
 
 关于动态材质相信读者都不会太陌生, 因为模组的模型加载说到底还是跟随了原版的机制, 所以我们固然可以想到动态资源包中常用的mcmeta格式以及瀑布般的长条材质, 其实Minecraft中重复简单的方块动画都可以用mcmeta配合一个包含动画过程关键帧的图片格式轻松实现, 其实彩虹桥方块的动画也是这样的, 在Botania的resources目录中我们可以找到bifrost.json, 这就是彩虹桥方块的模型
 
-```
+```json
 {
   "parent": "minecraft:block/cube_all",
   "textures": {
     "all": "botania:blocks/bifrost"
   }
 }
+/*
 Botania开源地址: https://github.com/Vazkii/Botania
 节选自(1.12-final分支): /resources/assets/botania/models/block/bifrost.json
+*/
 ```
 
 显然彩虹桥方块的模型与普通方块是相同的, 换句话说我们只需要关注动画材质就可以了, 根据Model里面声明的路径我们去找对应的贴图以及mcmeta文件.
@@ -57,7 +59,7 @@ Botania开源地址: https://github.com/Vazkii/Botania
 
 之后我们来看透明的实现, 在Bifrost的方块声明中我们可以找到如下代码
 
-```
+```java
 public class BlockBifrostPerm extends BlockMod implements ILexiconable {
 
 	public BlockBifrostPerm(String name) {
@@ -93,8 +95,10 @@ public class BlockBifrostPerm extends BlockMod implements ILexiconable {
 		
 	}
 }
+/*
 Botania开源地址: https://github.com/Vazkii/Botania
 节选自(1.12-final分支): /common/block/BlockBifrostPerm.java
+*/
 ```
 
 显然我们的彩虹桥方块需要像玻璃一样可以透光, 在Minecraft1.15.2中我们可以让方块直接继承自AbstractGlassBlock从而直接得到类似玻璃的透光能力, 但在1.12.2我们还不能这样做, 于是我们可以覆盖isOpaqueCube isFullCube getRenderLayer等一系列方法, 使方块可以透光, 为了拥有更好的显示效果, Vazkii还覆盖了shouldSideBeRendered方法, 重叠的面将不会渲染, 这里笔者就不多说了, 读者可以自行阅读上文该方法的代码
@@ -103,14 +107,16 @@ Botania开源地址: https://github.com/Vazkii/Botania
 
 有心的读者如果去Github阅读了BlockBifrostPerm的源码可以发现我们列举的代码中缺少了如下部分
 
-```
+```java
 @Override
 public void randomDisplayTick(IBlockState state, World world, BlockPos pos, Random rand) {
     if(rand.nextBoolean())
         Botania.proxy.sparkleFX(pos.getX() + Math.random(), pos.getY() + Math.random(), pos.getZ() + Math.random(), (float) Math.random(), (float) Math.random(), (float) Math.random(), 0.45F + 0.2F * (float) Math.random(), 6);
 }
+/*
 Botania开源地址: https://github.com/Vazkii/Botania
 节选自(1.12-final分支): /common/block/BlockBifrostPerm.java
+*/
 ```
 
 显然这段代码的含义便是粒子效果的渲染, randomDisplayTick会在贴图刷新的随机游戏刻执行, 可以看到Vazkii在代码的开头使用if (rand.nextBoolean())使下面代码执行的概率变为50%, 防止生成太多粒子造成卡顿. Vazkii自己实现了一套proxy来运行sparkleFX()来保持客户端渲染, 并且让粒子可以运动, 其中大多使用GL直接渲染, 这里的实现略微有点复杂我们就不展开了, 读者如果希望粒子效果包含运动的效果, 可以自行阅读Botania源码, 其代码大多位于fx包中
@@ -121,7 +127,7 @@ Botania开源地址: https://github.com/Vazkii/Botania
 
 在BlockBifrost类中, 我们可以发现彩虹桥方块绑定了TileEntity, 其类为TileBifrost, 用于储存数据, 我们来看一下TileBifrost类
 
-```
+```java
 public class TileBifrost extends TileMod implements ITickable {
 
 	private static final String TAG_TICKS = "ticks";
@@ -152,8 +158,10 @@ public class TileBifrost extends TileMod implements ITickable {
 	}
 
 }
+/*
 Botania开源地址: https://github.com/Vazkii/Botania
 节选自(1.12-final分支): /common/block/tile/TileBifrost.java
+*/
 ```
 
 显然TileBifrost实现了ITickable, 这意味着这个方块具备了刷新数据的能力, 阅读update方法我们发现, 其实质就是自减内部储存的tick值, 如果减没了, 那么就使方块消失, writeToNBT和readFromNBT的用途不言而喻, 常写TileEntity的读者一定对其有所了解, Minecraft会在合适的时候(一般是保存世界和读取世界的时候)调用这两个方法, 以便于在进入和退出存档之前读写方块里面的数据
@@ -166,7 +174,7 @@ Botania开源地址: https://github.com/Vazkii/Botania
 
 建筑小助手是direwolf20作为模组开发者的处女作, 其中各种小助手可以隔数十格远放置方块, 手中握着小助手就可以追踪到目光所及之处的方块, 通过查阅建筑小助手GadgetBuilding类的代码, 我们可以找到如下方法
 
-```
+```java
 private void build(ServerPlayerEntity player, ItemStack stack) {
 	······
     BlockRayTraceResult lookingAt = VectorHelper.getLookingAt(player, stack);
@@ -177,15 +185,17 @@ private void build(ServerPlayerEntity player, ItemStack stack) {
 	placeBlock(world, player, index, builder, coordinate, blockData);
 	······
 }
+/*
 BuildingGadgets开源地址: https://github.com/Direwolf20-MC/BuildingGadgets
 节选自(master分支): /common/items/gadgets/GadgetBuilding.java
+*/
 ```
 
 可以猜想, 在GadgetBuilding类的build方法中, 实现了建筑小助手追踪视线并放置方块的特性, 细心的读者可能发现, build方法里面还具有针对Collection和Undo操作功能实现, 的这里由于篇幅所限, 不能为读者介绍到更为详细的部分, 感兴趣的读者可以自行阅读查看
 
 根据节选的代码片段, 相信读者可以发现, 追踪方块的实现依赖与VectorHelper.getLookingAt()这个方法, 他的返回值为一个BlockRayTraceResult, 对这个光追结果进行getPos(), 就可以获取到目光所及之处了, 所以我们更进一步, 来看看VectorHelper的具体实现
 
-```
+```java
 public class VectorHelper {
     public static BlockRayTraceResult getLookingAt(PlayerEntity player, RayTraceContext.FluidMode rayTraceFluid) {
         double rayTraceRange = Config.GENERAL.rayTraceRange.get();
@@ -194,8 +204,10 @@ public class VectorHelper {
         return (BlockRayTraceResult) result;
     }
 }
+/*
 BuildingGadgets开源地址: https://github.com/Direwolf20-MC/BuildingGadgets
 节选自(master分支): /common/util/helpers/VectorHelper.java
+*/
 ```
 
 VectorHelper中包含了对于getLookingAt()的多个重写, 显然, 我们的目光重点应该放在player.pick()方法上, 相信聪明的读者已经意识到了什么, player.pick()就是原版为我们提供好的RayTrace的方法, 我们只需要提供Range(第一个参数), 和流体追踪模式(第三个参数)就可以了
@@ -205,3 +217,5 @@ VectorHelper中包含了对于getLookingAt()的多个重写, 显然, 我们的�
 ### 海运则将徙于南冥
 
 之后我们就要着手来将这两个点子融合, 我们再来回顾一下我们的想法, 既利用彩虹桥方块的发光效果, 以及建筑小助手getLookingAt()方法来制作一个便利的建筑方块, 
+
+非常抱歉的是, 下面的内容因为 MCBBS 关站而遗失了, 如果你曾经无意间保存了下面内容的副本, 请联系我将这部分补全.

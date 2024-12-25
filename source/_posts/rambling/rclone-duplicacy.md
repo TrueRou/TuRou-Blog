@@ -1,9 +1,8 @@
 ---
-title: Rclone搭配Duplicacy实现小文件高效备份到OneDrive (世纪互联)
+title: Rclone搭配Duplicacy实现小文件高效备份
 date: 2024-02-14 11:00:04
 categories: [rambling]
 tags:
-    - 文件备份
     - 杂谈
 ---
 

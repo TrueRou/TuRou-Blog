@@ -22,7 +22,7 @@ tags:
 
 站在开发的角度我们可以理解, 息壤的实现主要有两部分, 一是**判定交互的方块应该用何种工具挖掘**, 二是**在物品栏寻找对应的工具替换手中的错误工具**, 我们先抛开第二个问题不谈, 来看看如何实现第一个部分, 我们可以在TT的开源项目关于息壤的代码中找到如下的部分
 
-```
+```java
 if (block != null) {
 	Material mat = block.getMaterial();
 	if (ToolHandler.isRightMaterial(mat, ToolHandler.materialsPick))
@@ -32,13 +32,15 @@ if (block != null) {
 	else if (ToolHandler.isRightMaterial(mat, ToolHandler.materialsAxe))
 		typeToFind = "axe";
 }
+/*
 神秘工匠开源地址: https://github.com/Thaumic-Tinkerer/ThaumicTinkerer/
 节选自(1.7.10分支): /common/item/kami/ItemProtoclay.java
+*/
 ```
 
 不难看出TT的作者自己实现了一个实用的方法**"isRightMaterial"**, 来判断方块A是否应该用工具B来采掘, 继续深入, 我们来看看**ToolHandler.isRightMaterial()**方法的相关细节
 
-```
+```java
 public static Material[] materialsPick = new Material[]{ Material.rock, Material.iron, Material.ice, Material.glass, Material.piston, Material.anvil };
 
 public static Material[] materialsShovel = new Material[]{ Material.grass, Material.ground, Material.sand, Material.snow, Material.craftedSnow, Material.clay };
@@ -52,8 +54,10 @@ public static boolean isRightMaterial(Material material, Material[] materialsLis
 	}
 	return false;
 }
+/*
 神秘工匠开源地址: https://github.com/Thaumic-Tinkerer/ThaumicTinkerer/
 节选自(1.7.10分支): /common/item/kami/tool/ToolHandler.java
+*/
 ```
 
 看到这里, 相信读者已经略知一二了, 既isRightMaterial实则遍历了一遍**你提供的Material[]**, 如果你提供的Material是预先填充好的Material[]中的成员, 则返回了true. 如果作为读者的你觉得这有点暴力, 那不妨去看看ItemPickaxe等对应工具类的源码(雾), 这里就不展示了
@@ -82,7 +86,7 @@ if (找找NBT里面午餐盒是开着的吗) {
 
 思而不学则殆, 下面我们来看看午餐盒改变贴图的代码
 
-```
+```java
 @SideOnly(Side.CLIENT)
 public void registerModels()
 {
@@ -105,8 +109,10 @@ public void registerModels()
         }
     });
 }
+/*
 生活调味料开源地址: https://github.com/squeek502/SpiceOfLife/
 节选自(1.12分支): /items/ItemFoodContainer.java
+*/
 ```
 
 前三行代码很普通的声明了三个ModelResourceLocation, 其地址很普通的对应了三个Model的json文件, 这与创建三个物品为他们分配贴图的时候的ModelResourceLocation没什么大区别, 读者像普通给物品放贴图一样的方式来声明就可以了
@@ -135,7 +141,7 @@ public void registerModels()
 
 俗话说万事开头难, 但写一个工具的开头还是很简单的, 我们可以简单创建一个继承自ItemTool的工具并且使其包含所有方块, 不过这个解决方案不够浪漫, 所以我们直接继承自ItemPickaxe, 然后为其添加斧和铲的支持, 对于原版来说, 我们直接允许我们的万能工具挖掘所有的方块都用efficiency的速度就万事大吉了
 
-```
+```java
 public class UniversalIronTool extends ItemPickaxe {
     public UniversalIronTool() {
         super(ToolMaterial.IRON);
@@ -157,7 +163,7 @@ public class UniversalIronTool extends ItemPickaxe {
 
 之后我们就要着手给我们的工具添加材质了, 也是本章的重中之重, 首先我们一如既往的监听**ModelRegistryEvent**
 
-```
+```java
 @SubscribeEvent
     @SideOnly(Side.CLIENT)
     public static void onModelRegistry(ModelRegistryEvent event) {
@@ -167,7 +173,7 @@ public class UniversalIronTool extends ItemPickaxe {
 
 有了午餐盒的经验, 我们已经对自定义模型的添加有了初步认识, 我们这里先小小的复习一下: 首先我们应该告诉Minecraft去准备我们需要的模型. 像下面这样, 我们声明需要的模型, 并且拜托Minecraft先为我们加载着
 
-```
+```java
 @SubscribeEvent
     @SideOnly(Side.CLIENT)
     public static void onModelRegistry(ModelRegistryEvent event) {
@@ -191,7 +197,7 @@ public class UniversalIronTool extends ItemPickaxe {
 
 有了想法我们就可以开始实践了, 我们先把渲染趁热打铁写完, 我们在上文的代码结束处追加
 
-```
+```java
 //这里universalIronTool是刚刚创建的继承自ItemPickaxe类的实例
 ModelLoader.setCustomMeshDefinition(universalIronTool, itemStack -> {
     if (itemStack.hasTagCompound()){
@@ -213,7 +219,7 @@ ModelLoader.setCustomMeshDefinition(universalIronTool, itemStack -> {
 
 玩家挖掘方块的一刹那, 相信读者头脑中自然就产生了监听**PlayerInteractEvent**事件的念头, 那么恭喜你, 猜对了, 我们正是要监听玩家与方块交互的这个事件, 我们创建EventHandler类并监听它
 
-```
+```java
 @Mod.EventBusSubscriber(modid = "forgedev")
 public class EventHandler {
     @SubscribeEvent
@@ -233,7 +239,7 @@ public class EventHandler {
 
 相信代码的含义读者也一目了然, 我们给ItemStack创建了一个NBT, 并且调用**ToolUtils.getRightTool()**方法来获取指定方块应该用什么工具来采掘..........Wait a second.......别着急, 我们现在来创建ToolUtils类
 
-```
+```java
 public class ToolUtils {
     private static Material[] materialsPickaxe = new Material[]{ Material.ROCK, Material.IRON, Material.ICE, Material.GLASS, Material.PISTON, Material.ANVIL };
     private static Material[] materialsShovel = new Material[]{ Material.GRASS, Material.GROUND, Material.SAND, Material.SNOW, Material.CRAFTED_SNOW, Material.CLAY };
@@ -277,5 +283,3 @@ public class ToolUtils {
 
 - 我们能否通过多态和封装让我们的万能工具直接支持原版所有的材料呢?
 - 思考能否通过**MeshDefinition**来**动态生成**材质呢
-
-基于本文的实例制作的Mod: https://www.mcbbs.net/thread-1010246-1-1.html (其源码中实现了课后思考1, 读者感兴趣可以阅读)

@@ -19,7 +19,7 @@ tags:
 按照需求, 我们在trou.arch下创建network包, 并且创建ModPackets类
 
 ```java
-位于common: trou/arch/network/ModPackets.java
+// 位于common: trou/arch/network/ModPackets.java
 public class ModPackets {
     public static final ResourceLocation EXP_CONTAINER_MODE = new ResourceLocation("arch", "exp_container_change_mode");
 
@@ -57,7 +57,7 @@ context包含了一些随包携带的常用参数, 包含发起的玩家和Envir
 接下来我们要处理逻辑服务端触发的raiseMode方法, 我们希望通过这个方法改变手中经验储存器的单次存取量.
 
 ```java
-位于common: trou/arch/item/ItemExpContainer.java
+// 位于common: trou/arch/item/ItemExpContainer.java
 public static void raiseMode(ItemStack stack, int value) {
     if (!(stack.getItem() instanceof ItemExpContainer)) return;
     CompoundTag tag = stack.hasTag() ? stack.getTag() : new CompoundTag();
@@ -72,7 +72,7 @@ public static void raiseMode(ItemStack stack, int value) {
 我们还需要修改存取经验时的逻辑, 使其按照我们设定的数值进行存取
 
 ```java
-位于common: trou/arch/item/ItemExpContainer.java
+// 位于common: trou/arch/item/ItemExpContainer.java
 @Override
 public InteractionResultHolder<ItemStack> use(@NotNull Level level, @NotNull Player player, @NotNull InteractionHand usedHand) {
     ItemStack stack = player.getItemInHand(usedHand);
@@ -116,7 +116,7 @@ public InteractionResultHolder<ItemStack> use(@NotNull Level level, @NotNull Pla
 修改ModEvents类来监听这个事件, 并且在ItemExpContainer类中编写事件处理器
 
 ```java
-位于common: trou/arch/object/ModEvents.java
+// 位于common: trou/arch/object/ModEvents.java
 public class ModEvents {
     public static void register() {
         ClientTooltipEvent.ITEM.register(ItemExpContainer::appendTooltip);
@@ -128,7 +128,7 @@ public class ModEvents {
 显然 ClientRawInputEvent 只会在客户端进入世界后触发, 我们可以直接用 minecraft.player 来拿到非空的本地玩家
 
 ```java
-位于common: trou/arch/item/ItemExpContainer.java
+// 位于common: trou/arch/item/ItemExpContainer.java
 // 向上滚动 v = 1.0 向下滚动 v = -1.0
 public static EventResult mouseScroll(Minecraft minecraft, double v) {
     assert minecraft.player != null; // 断定minecraft.player不为空
@@ -160,7 +160,7 @@ NetworkChannel的核心概念是Channel和Message, 当网络通信时, 我们的
 所以我们在network包中创建MessageThrowExp类, 来诠释丢经验这条消息
 
 ```java
-位于common: trou/arch/network/MessageThrowExp.java
+// 位于common: trou/arch/network/MessageThrowExp.java
 public class MessageThrowExp {
     public final UUID targetPlayerUUID;
     
@@ -199,7 +199,7 @@ apply方法会在ByteBuf的值序列化到实例中后被逻辑服务器调用, 
 完成了Message, 接下来我们需要定义并注册承载它的Channel, 在network包下创建ModChannels类
 
 ```java
-位于common: trou/arch/network/ModChannels.java
+// 位于common: trou/arch/network/ModChannels.java
 public class ModChannels {
     public static final NetworkChannel CHANNEL = NetworkChannel.create(new ResourceLocation("arch", "exp_container"));
 
@@ -220,7 +220,7 @@ public class ModChannels {
 相信这里不必笔者多说, 读者应该已经想出了相关逻辑
 
 ```java
-位于common: trou/arch/item/ItemExpContainer.java
+// 位于common: trou/arch/item/ItemExpContainer.java
 public static void doThrow(ItemStack stack, Player target) {
     if (!(stack.getItem() instanceof ItemExpContainer)) return;
     CompoundTag tag = stack.hasTag() ? stack.getTag() : new CompoundTag();
@@ -242,7 +242,7 @@ ArchitecturyAPI为我们提供了通用的添加热键的方式.
 创建trou.arch.client包, 并创建ModKeys类, 创建我们的KeyMapping
 
 ```java
-位于common: trou/arch/client/ModKeys.java
+// 位于common: trou/arch/client/ModKeys.java
 public class ModKeys {
     public static final KeyMapping THROW_EXP = new KeyMapping("key.arch.throw_exp", InputConstants.Type.KEYSYM, InputConstants.KEY_Z, "category.arch");
 
@@ -266,7 +266,7 @@ KeyMapping的构造器需要四个参数
 这里我们在ModEvents中监听事件, 并且编写事件处理器
 
 ```java
-位于common: trou/arch/object/ModEvents.java
+// 位于common: trou/arch/object/ModEvents.java
 public class ModEvents {
     public static void register() {
         ...
@@ -274,7 +274,7 @@ public class ModEvents {
     }
 }
 
-位于位于common: trou/arch/client/ModKeys.java
+// 位于位于common: trou/arch/client/ModKeys.java
 public static void handleThrowExpKey(Minecraft minecraft) {
     while (THROW_EXP.consumeClick()) {
         if (minecraft.player == null) return;
@@ -300,7 +300,7 @@ public static void handleThrowExpKey(Minecraft minecraft) {
 阅读上文的代码后, 你的主类应该是这样的
 
 ```java
-位于common: trou/arch/Arch.java
+// 位于common: trou/arch/Arch.java
 public class Arch {
     public static final String MOD_ID = "arch";
 

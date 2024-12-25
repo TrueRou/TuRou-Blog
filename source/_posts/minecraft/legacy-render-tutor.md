@@ -42,7 +42,7 @@ TileEntitySpecialRenderer(下文简称为TESR)顾名思义, 是基于TileEntity�
 
 固定管线与可编程渲染管线相对应, 固定管线可以从字面理解, 管线中渲染的方式是完全固定的, 所以我们可能会看到这样的伪代码: 
 
-```
+```java
 class MyTESR {
     render(...) {
         GL.RenderALight(x1, y1, z1);
@@ -89,22 +89,24 @@ OpenGL: 好的(满血复活, 继续别的工作)
 
 答案是肯定的, 饼干罐一定有自己的TileEntity储存内部的饼干数量, 并且会有一个TESR指导渲染工作, 于是我们可以找到如下代码
 
-```
+```java
 public class CookieRenderer extends TileEntitySpecialRenderer<TileEntityCookieJar> {
     @Override
     public void render(TileEntityCookieJar cookieJar, double x, double y, double z, float partialTicks, int destroyStage, float alpha) {
         //Render work
     }
 }
+/*
 仓库地址: https://github.com/MrCrayfish/MrCrayfishFurnitureMod/
 节选自: /1.12.2/src/main/java/com/mrcrayfish/furniture/render/tileentity/CookieRenderer.java
+*/
 ```
 
 不出我们所料, 果然有一个render方法负责渲染整个方块, 但细心的读者可能发现, 里面的渲染工作似乎与我们之前所描述的过程有一些区别, 我们可以看到代码中是围绕曲奇饼的EntityItem进行渲染, 但我们并没有发现这个玻璃罐子的渲染. 这里其实是因为TileEntitySpecialRender中强调了Special一词, 这也就表面我们只需渲染其特殊的一部分就可以了, 静态的罐子并不特殊, 他是以普通的模型->材质的方式来定义的, 所以不在TESR渲染的范围内.
 
 接下来我们来具体看我们省略的Render work部分.
 
-```
+```java
 GL11.glPushMatrix(); //保存变换前的位置和角度
     //Some Code
 GL11.glPopMatrix(); //读取变换前的位置和角度(恢复原状)
@@ -112,7 +114,7 @@ GL11.glPopMatrix(); //读取变换前的位置和角度(恢复原状)
 
 根据上文我们提到的OpenGL状态机和OpenGL上下文的特点, 相信读者不难想出为什么这两行代码是成对出现的. 其实, 这两句代码就是我们上文提到的一个保存和读取的功能, 而这里, 我们保存和读取的是矩阵(这里可以看做是Minecraft世界中的坐标). 我们先保存之前的坐标状态, 然后在中间的渲染步骤中随意的变更, 操作坐标, 最后读取回原来的状态, 渲染顺利进行的同时不会破坏OpenGL原有的工作.
 
-```
+```java
 GL11.glDisable(GL11.GL_LIGHTING);
     //Some Code
 GL11.glEnable(GL11.GL_LIGHTING);
@@ -122,7 +124,7 @@ GL11.glEnable(GL11.GL_LIGHTING);
 
 好, 状态保存的问题已经解决了, 接下来就该轮到我们大搞特搞地来渲染具体物品的环节了, 而这时我们看到了translate语句.
 
-```
+```java
 GL11.glTranslatef((float) x + 0.5F, (float) y + 0.05F, (float) z + 0.18F); //设置"原点"
 ...
 GlStateManager.translate(0, -0.1, 0); //沿y轴负方向移动0.1个单位
@@ -134,13 +136,13 @@ GlStateManager.translate(0, -0.1, 0); //沿y轴负方向移动0.1个单位
 
 当开发者需要对当前操作坐标进行旋转变换时, 可能需要多次进行translate操作, 相信读者可以在之后的工作中逐步理解这个概念. 而这里, 我们猜测MrCrayfish是将渲染原点定在了靠近罐子中心底部的位置, 以便进行接下来的操作.
 
-```
+```java
 GL11.glRotatef(180, 0, 1, 1); //沿着y轴和z轴方向旋转180度
 ```
 
 之后, 我们对操作的矩阵进行了旋转变换, 目的是为了在下一步的渲染中让曲奇饼"平躺"在罐子的底部, 而不是竖直立在罐子里面. 
 
-```
+```java
 GL11.glScalef(0.9F, 0.9F, 0.9F); //xyz轴各缩放0.9倍
 ```
 
@@ -158,7 +160,7 @@ GL11.glScalef(0.9F, 0.9F, 0.9F); //xyz轴各缩放0.9倍
 
 到这里, 坐标的预处理工作已经完成了, 也就是我们现在坐标的位置已经位于饼干罐中心靠近底部的位置了, 我们只需在当前位置渲染出一个Minecraft原版曲奇的贴图, 就完成了, 而MrCrayfish也是这样做的, 用一对for循环嵌套, 逐个渲染出物品的位置, 完成我们的工作
 
-```
+```java
 for(int i = 0; i < metadata; i++) {
     Minecraft.getMinecraft().getRenderManager().renderEntity(entityItem, 0.0D, 0.0D, 0.1D * i, 0.0F, 0.0F, false);
 }
@@ -174,7 +176,7 @@ for(int i = 0; i < metadata; i++) {
 
 根据以上的学习, 笔者自己也尝试写了一个TESR, 读者可以用自己学到的知识简单解析一下
 
-```
+```java
 @Override
 public void render(TestBlockTile te, double x, double y, double z, float partialTicks, int destroyStage, float alpha) {
     GlStateManager.PushMatrix();
@@ -210,7 +212,7 @@ public void render(TestBlockTile te, double x, double y, double z, float partial
 
 ### 文字渲染 —— fontRenderer
 
-```
+```java
 private void renderText(String text, double x, double y, double z, EnumFacing side, EnumFacing barrelFront)
     {
         FontRenderer fontRenderer = Minecraft.getMinecraft().fontRenderer;
@@ -236,13 +238,15 @@ private void renderText(String text, double x, double y, double z, EnumFacing si
 
         GlStateManager.popMatrix();
     }
+/*
 仓库地址: https://github.com/maruohon/enderutilities/
 节选自: /MC_1.11.x/src/main/java/fi/dy/masa/enderutilities/client/renderer/tileentity/TESRBarrel.java
+*/
 ```
 
 这里笔者将translate部分语句省略了, 作为储物桶来说, 有一个面是玩家的操作面, 所有的文字和图标应该渲染在这个方向上, 作者的translate语句正是将操作方向转移到操作面上. 感兴趣的读者可以自行阅读相关代码, 这里我们一起来看看一些我们没有介绍过的GL语句以及字体渲染的方法
 
-```
+```java
 GlStateManager.enablePolygonOffset();
 GlStateManager.doPolygonOffset(-1, -20);
 GlStateManager.disablePolygonOffset();
@@ -285,7 +289,7 @@ fontRenderer.drawString(text, -strLenHalved, 0, 0xFFFFFFFF);
 
 > Tessellator代替了我们直接调用GL的一个个方法调用, Tessellator收集了关于渲染细节的一个数组, 并且规定这个数组哪些部分代表什么(以便于渲染器正确组织数组中的数据), 并且批量提交给GPU进行绘制, 最后这些细节会被传进VBO, 然后用 glDrawArray 批量画出来.
 
-```
+```java
 Minecraft.getMinecraft().getTextureManager().bindTexture(TEXTURE_LOCK);
 Tessellator tessellator = Tessellator.getInstance(); //获取Tessellator的一般方式
 VertexBuffer buffer = tessellator.getBuffer(); //获取记录顶点信息的"数组"
@@ -306,7 +310,7 @@ tessellator.draw(); //将数组和渲染方式提交到GPU
 
 这里读者应该对Tessellator矩形绑定材质的渲染方式有了初步的了解. 下面我们来进一步巩固一下我们的理解
 
-```
+```java
 buffer.begin(GL11.GL_QUADS, DefaultVertexFormats.POSITION_COLOR); //指定数组的组织方式(位置 + 颜色值), 以及要画的图像的顶点数(矩形四个顶点)
 
 int r_b = 0x03;

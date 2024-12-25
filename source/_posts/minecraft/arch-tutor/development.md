@@ -24,7 +24,7 @@ tags:
 在 **trou.arch.item** 包下创建 **ItemExpContainer** 类, 使其继承自**原版的**Item类
 
 ```java
-位于common: trou/arch/item/ItemExpContainer.java
+// 位于common: trou/arch/item/ItemExpContainer.java
 public class ItemExpContainer extends Item {
     public ItemExpContainer() {
         super(new Properties().stacksTo(1).tab(CreativeModeTab.TAB_TOOLS));
@@ -47,7 +47,7 @@ Architectury这里采用原版(Fabric)的架构, 而为Forge进行兼容是合�
 在 **trou.arch.object** 包下创建 **ModItems** 类
 
 ```java
-位于common: trou/arch/object/ModItems.java
+// 位于common: trou/arch/object/ModItems.java
 public class ModItems {
     private static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Arch.MOD_ID, Registry.ITEM_REGISTRY);
     public static final RegistrySupplier<Item> EXP_CONTAINER_ITEM = ITEMS.register("exp_container_item", ItemExpContainer::new);
@@ -66,7 +66,7 @@ public class ModItems {
 <mark style="color:red;">**因为Forge的某些限制, 我们需要在forge模块中手动注册一次Architectury的事件总线**</mark>
 
 ```java
-位于forge: trou/arch/forge/ArchForge.java
+// 位于forge: trou/arch/forge/ArchForge.java
 @Mod(Arch.MOD_ID)
 public class ArchForge {
     public ArchForge() {
@@ -90,19 +90,19 @@ public class ArchForge {
 common模块中的assets在编译的时候会被合并进forge和fabric模块中, 所以我们只需按照熟悉的方式将本地化文件和材质放在common模块中就可以了.
 
 ```json
-位于common: assets/arch/lang/zh_cn.json
+// 位于common: assets/arch/lang/zh_cn.json
 {
   "item.arch.exp_container_item": "经验储存器",
   "tooltip.exp_container": "已储存经验: %s exp"
 }
 
-位于common: assets/arch/lang/en_us.json
+// 位于common: assets/arch/lang/en_us.json
 {
   "item.arch.exp_container_item": "Experience Container",
   "tooltip.exp_container": "Stored experience: %s exp"
 }
 
-位于common: assets/arch/models/item/exp_container_item.json
+// 位于common: assets/arch/models/item/exp_container_item.json
 {
   "parent": "item/generated",
   "textures": {
@@ -110,7 +110,7 @@ common模块中的assets在编译的时候会被合并进forge和fabric模块中
   }
 }
 
-位于common: assets/arch/textures/item/exp_container_item.png
+// 位于common: assets/arch/textures/item/exp_container_item.png
 // 在这里放置物品的材质
 ```
 
@@ -119,7 +119,7 @@ common模块中的assets在编译的时候会被合并进forge和fabric模块中
 根据我们的需求, 需要覆盖物品的use方法, 并编写我们的逻辑, 这里相信有经验的读者可以完成
 
 ```java
-位于common: trou/arch/item/ItemExpContainer.java
+// 位于common: trou/arch/item/ItemExpContainer.java
 @Override
 public InteractionResultHolder<ItemStack> use(@NotNull Level level, @NotNull Player player, @NotNull InteractionHand usedHand) {
     ItemStack stack = player.getItemInHand(usedHand);
@@ -152,7 +152,7 @@ ArchitecturyAPI为我们提供了一些常用的事件, 在上一章节可以找
 这里我们需要监听**ClientTooltipEvent**事件, 首先创建一个类来注册所有的事件
 
 ```java
-位于common: trou/arch/object/ModEvents.java
+// 位于common: trou/arch/object/ModEvents.java
 public class ModEvents {
     public static void register() {
         // 需要传入的是事件处理器的方法
@@ -160,7 +160,7 @@ public class ModEvents {
     }
 }
 
-位于common: trou/arch/Arch.java
+// 位于common: trou/arch/Arch.java
 public class Arch {
     public static void init() {
         ModEvents.register(); // 在init阶段注册事件
@@ -171,7 +171,7 @@ public class Arch {
 然后我们按照代码提示, 在ItemExpContainer类中补全append方法来处理事件
 
 ```java
-位于common: trou/arch/item/ItemExpContainer.java
+// 位于common: trou/arch/item/ItemExpContainer.java
 public static void append(ItemStack stack, List<Component> lines, TooltipFlag flag) {
     if (stack.getItem() instanceof ItemExpContainer) {
         CompoundTag tag = stack.hasTag() ? stack.getTag() : new CompoundTag();

@@ -1,7 +1,7 @@
 ---
-title: 浅谈国内外恋爱冒险游戏产业的发展 - 软工导论课作业
+title: 浅谈国内外恋爱冒险游戏产业的发展
 date: 2024-01-26 11:19:59
-categories: [papers]
+categories: [rambling]
 tags:
     - Galgame
     - 杂谈
