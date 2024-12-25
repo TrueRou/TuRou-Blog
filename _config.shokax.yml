@@ -12,6 +12,49 @@ widgets:
   random_posts: false
   recent_comments: false
 
+font:
+  enable: true
+  # 从google字体库加载,如果自定义@font-face请关闭
+  loadFromGoogle: true
+  # 字体选项:
+  # `external`:从google字体库加载字体.
+  # `family: 字体家族名,无需引号
+  # `size: x.x`. 以`em`为单位. 默认: 1 (16px)
+
+  # 适用于所有在body标签内的文字.
+  global:
+    external: true
+    family: Mulish
+    size:
+
+  # 大标题字体.
+  logo:
+    external: true
+    family: Fredericka the Great
+    size: 3.5
+
+  # 页面标题字体.
+  title:
+    external: true
+    family:
+    size: 2.5
+
+  # 标题字体.
+  headings:
+    external: true
+    family:
+    size:
+
+  # 文章字体.
+  posts:
+    external: false
+    family:
+
+  # 代码块的字体
+  codes:
+    external: true
+    family: Inconsolata
+
 footer:
   since: 2023
   count: true
@@ -42,13 +85,9 @@ menu:
     default: / || feather
     categories: /categories/ || th
     tags: /tags/ || tags
-    archives: /archives/ || list-alt 
+    archives: /archives/ || list-alt
   about: /about/ || user
   friends: /friends/ || heart
 
 reward:
   enable: false
-
-vendors:
-  css:
-    fancybox: https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css
