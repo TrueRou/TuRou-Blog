@@ -91,3 +91,6 @@ menu:
 
 reward:
   enable: false
+
+experiments:
+  antiFakeWebsite: false
