@@ -20,4 +20,11 @@ date: 2022-01-01 00:00:00
   image: https://image.im0o.top/files/202112021204213.jpg
   color: "#F47F2C"
 
+- site: FrZ's Blog
+  owner: FrZ
+  url: https://blog.frzmeow.cc/
+  desc: 我瞎写的来看什么？
+  image: https://blog.frzmeow.cc/avatar.jpg
+  color: "#A50D00"
+
 {% endlinks %}
