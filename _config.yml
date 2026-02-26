@@ -161,3 +161,24 @@ ignore:
 ## Plugins: https://hexo.io/plugins/
 ## Themes: https://hexo.io/themes/
 theme: shokax
+
+bangumi:
+  show: 1
+  source: bgmv0
+  vmid: 551002
+  path: subscribe/bangumi.html
+  enable: true
+  progressBar: false
+  showMyComment: true
+  swup: true
+  coverMirror: https://images.weserv.nl/?h=600&w=440&fit=cover&url=
+game:
+  show: 2
+  source: bgmv0
+  vmid: 551002
+  path: subscribe/galgame.html
+  enable: true
+  progressBar: false
+  showMyComment: true 
+  swup: true
+  coverMirror: https://images.weserv.nl/?h=600&w=440&fit=cover&url=

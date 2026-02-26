@@ -9,15 +9,17 @@
     "build": "hexo generate",
     "clean": "hexo clean",
     "deploy": "hexo deploy",
-    "server": "hexo server"
+    "server": "hexo server",
+    "update": "hexo bangumi -u && hexo cinema -u && hexo game -u"
   },
   "dependencies": {
     "@algolia/client-search": "^4.22.1",
     "@waline/client": "^3.0.1",
     "algoliasearch": "^4.22.1",
     "esbuild": "^0.20.0",
-    "hexo": "^7.0.0",
+    "hexo": "^7.3.0",
     "hexo-algoliasearch": "^2.0.1",
+    "hexo-bilibili-bangumi": "^2.0.4",
     "hexo-deployer-git": "^4.0.0",
     "hexo-feed": "^1.1.2",
     "hexo-fs": "^4.1.1",

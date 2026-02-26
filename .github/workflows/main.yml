@@ -8,6 +8,8 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "0 2 * * *"
 
 jobs:
   frontend:
@@ -25,7 +27,7 @@ jobs:
         run: npm install
         
       - name: Run build task
-        run: npm run build
+        run: npm run update && npm run build
       
       - name: Deploy to Server
         uses: easingthemes/ssh-deploy@v5.1.0

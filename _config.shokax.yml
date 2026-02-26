@@ -86,6 +86,10 @@ menu:
     categories: /categories/ || th
     tags: /tags/ || tags
     archives: /archives/ || list-alt
+  订阅:
+    default: / || cloud
+    番剧: /subscribe/bangumi.html || bilibili
+    旮旯: /subscribe/galgame.html || music
   about: /about/ || user
   friends: /friends/ || heart
 
